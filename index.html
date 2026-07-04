@@ -347,9 +347,11 @@
       <h2>Google Drive <span id="driveStatus" style="font-weight:400;text-transform:none;color:var(--muted);letter-spacing:0">— not connected</span></h2>
       <div id="driveSetup">
         <div class="notice" style="margin-bottom:10px">
-          <b>One-time setup (5 min):</b> Go to <b>console.cloud.google.com</b> → New Project → Enable Drive API →
-          Credentials → OAuth 2.0 Client ID (Web app) → add <b>this page's URL</b> as Authorised origin → paste Client ID below.
-          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#1a3a6e;font-weight:600">Open Google Console ↗</a>
+          <b>One-time setup:</b> In Google Console → OAuth Client → add this page's URL as both
+          <b>Authorised JavaScript origin</b> AND <b>Authorised redirect URI</b>:
+          <code style="background:#fff3cd;padding:1px 5px;border-radius:3px;font-size:11px;word-break:break-all" id="thisUrl"></code>
+          <br>Then paste your Client ID below and click Connect.
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#1a3a6e;font-weight:600;display:inline-block;margin-top:4px">Open Google Console ↗</a>
         </div>
         <div class="field row">
           <div style="grid-column:span 2">
@@ -777,80 +779,86 @@ async function ensureToken(){
   if(saved){gToken=saved;return true;}
   return await gRefreshToken();
 }
-async function gRefreshToken(){
-  const{clientId}=loadDriveConfig();
-  const refresh=store.get('g_refresh');if(!refresh)return false;
-  const res=await fetch('https://oauth2.googleapis.com/token',{method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({refresh_token:refresh,client_id:clientId,grant_type:'refresh_token'})});
-  const data=await res.json();
-  if(data.access_token){gToken=data.access_token;store.set('g_token',data.access_token);return true;}
-  return false;
-}
-async function gGetUser(){
-  if(!gToken)return;
-  const r=await fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:'Bearer '+gToken}});
-  const u=await r.json();
-  if(u.email){store.set('g_user',u.email);showDriveConnected(u.email);}
-}
+/* -- Implicit flow: token arrives in URL hash, no backend needed, works on GitHub Pages -- */
 function gSignIn(){
   const{clientId}=loadDriveConfig();
   if(!clientId){flash('Paste your Google OAuth Client ID first.');return;}
-  const verifier=btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/[^A-Za-z0-9]/g,'').slice(0,64);
-  store.set('g_verifier',verifier);
-  crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)).then(buf=>{
-    const challenge=btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    const redirect=location.href.split('#')[0].split('?')[0];
-    store.set('g_redirect',redirect);
-    const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    url.searchParams.set('client_id',clientId);
-    url.searchParams.set('redirect_uri',redirect);
-    url.searchParams.set('response_type','code');
-    url.searchParams.set('scope','https://www.googleapis.com/auth/drive.file');
-    url.searchParams.set('code_challenge',challenge);
-    url.searchParams.set('code_challenge_method','S256');
-    url.searchParams.set('access_type','offline');
-    url.searchParams.set('prompt','consent');
-    location.href=url.toString();
-  });
+  const redirect=location.href.split('#')[0].split('?')[0];
+  const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id',clientId);
+  url.searchParams.set('redirect_uri',redirect);
+  url.searchParams.set('response_type','token');   // implicit — token in hash, works without backend
+  url.searchParams.set('scope','https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email');
+  url.searchParams.set('prompt','select_account');
+  location.href=url.toString();
 }
-async function gExchangeCode(code){
-  const{clientId}=loadDriveConfig();
-  const verifier=store.get('g_verifier')||'';
-  const redirect=store.get('g_redirect')||location.href.split('?')[0];
-  const res=await fetch('https://oauth2.googleapis.com/token',{method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({code,client_id:clientId,redirect_uri:redirect,grant_type:'authorization_code',code_verifier:verifier})});
-  const data=await res.json();
-  if(data.access_token){
-    gToken=data.access_token;
-    store.set('g_token',data.access_token);
-    store.set('g_refresh',data.refresh_token||'');
-    await gGetUser();
-  }else{flash('Google auth failed: '+(data.error||'unknown'));}
+async function gGetUser(){
+  if(!gToken)return;
+  try{
+    const r=await fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:'Bearer '+gToken}});
+    const u=await r.json();
+    if(u.email){
+      store.set('g_user',u.email);
+      store.set('g_token',gToken);
+      showDriveConnected(u.email);
+    }else{gToken=null;store.set('g_token','');}
+  }catch(e){gToken=null;}
+}
+function handleOAuthRedirect(){
+  // Token comes back in URL hash: #access_token=xxx&expires_in=3599&...
+  if(!location.hash.includes('access_token'))return false;
+  const hash=new URLSearchParams(location.hash.replace(/^#/,''));
+  const token=hash.get('access_token');
+  const exp=parseInt(hash.get('expires_in')||'3600',10);
+  if(token){
+    history.replaceState({},'',location.pathname); // clean the URL immediately
+    gToken=token;
+    store.set('g_token',token);
+    store.set('g_token_exp',Date.now()+exp*1000);
+    gGetUser().then(()=>flash('✅ Google Drive connected! Token valid for 1 hour.',4000));
+    return true;
+  }
+  return false;
+}
+async function ensureToken(){
+  // In-memory token still valid?
+  const exp=store.get('g_token_exp')||0;
+  if(gToken&&Date.now()<exp-30000)return true;
+  // Try restoring from localStorage
+  const saved=store.get('g_token');
+  const savedExp=store.get('g_token_exp')||0;
+  if(saved&&Date.now()<savedExp-30000){gToken=saved;return true;}
+  // Expired — silent re-auth using iframe prompt=none
+  flash('Drive session expired — please reconnect.',3000);
+  return false;
 }
 async function getOrCreateFolder(name){
-  const cached=store.get('g_folder_id');if(cached){gFolderId=cached;return cached;}
+  // Don't cache folder ID across sessions — Drive file scope limits listing
   const q=`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
     {headers:{Authorization:'Bearer '+gToken}});
   const d=await r.json();
-  if(d.files&&d.files.length){gFolderId=d.files[0].id;store.set('g_folder_id',gFolderId);return gFolderId;}
+  if(d.files&&d.files.length){gFolderId=d.files[0].id;return gFolderId;}
   const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',
     headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},
     body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder'})});
   const cd=await cr.json();
-  gFolderId=cd.id;store.set('g_folder_id',gFolderId);return gFolderId;
+  gFolderId=cd.id;return gFolderId;
 }
 async function saveToGDrive(){
-  if(!await ensureToken()){flash('Not connected to Google Drive — connect first.');return;}
+  if(!await ensureToken()){
+    if(confirm('Drive session expired. Reconnect now?'))gSignIn();
+    return;
+  }
   const folder=store.get('g_folder')||'Vidhyux Invoices';
   flash('Uploading to Drive…');
   try{
     const fid=await getOrCreateFolder(folder);
     const inv=$('invoice').outerHTML;
     const css=document.querySelector('style').textContent;
-    const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${css}body{background:#f4f7fc;padding:20px}</style></head><body>${inv}</body></html>`;
+    const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>${css}body{background:#f4f7fc;padding:20px;margin:0}</style></head>
+<body>${inv}</body></html>`;
     const filename=pdfName().replace('.pdf','.html');
     const meta={name:filename,parents:[fid],mimeType:'text/html'};
     const form=new FormData();
@@ -864,13 +872,10 @@ async function saveToGDrive(){
       const reg=store.get('register')||[];
       const idx=reg.findIndex(x=>x.invno===$('invno').value);
       if(idx>=0){reg[idx].driveUrl=result.webViewLink;store.set('register',reg);renderRegister();}
-    }else{flash('Drive upload failed. Check Client ID and permissions.');}
+    }else{
+      flash('Drive error: '+(result.error&&result.error.message)||'unknown. Try reconnecting.');
+    }
   }catch(e){flash('Drive error: '+e.message);}
-}
-function handleOAuthRedirect(){
-  const params=new URLSearchParams(location.search);
-  const code=params.get('code');
-  if(code){history.replaceState({},'',location.pathname);gExchangeCode(code).then(()=>{flash('✅ Google Drive connected!');});}
 }
 
 /* ---------- toast ---------- */
@@ -886,17 +891,26 @@ function flash(msg,ms=3000){
 
 /* ---------- init ---------- */
 function init(){
+  // Handle OAuth token in hash FIRST before anything clears it
+  const wasRedirect=handleOAuthRedirect();
   loadCompany();loadDriveConfig();
   $('invdate').value=todayISO();
   $('invno').value=buildInvNo();
-  const savedUser=store.get('g_user');
-  const savedToken=store.get('g_token');
-  if(savedUser&&savedToken){gToken=savedToken;showDriveConnected(savedUser);}
-  handleOAuthRedirect();
+  // Restore Drive session from localStorage if token still valid
+  if(!wasRedirect){
+    const savedUser=store.get('g_user');
+    const savedToken=store.get('g_token');
+    const savedExp=store.get('g_token_exp')||0;
+    if(savedUser&&savedToken&&Date.now()<savedExp-30000){
+      gToken=savedToken;showDriveConnected(savedUser);
+    }
+  }
   ['invno','invdate','cust','panelBrand','panelQty','invBrand','invKw','invPhase','hsn','wPanel','wInv',
    'coName','coAddr','coEmail','coGst','coBank','coAcc','coIfs'].forEach(id=>{
     const el=$(id);if(el)el.addEventListener('input',calc);
   });
+  // Show exact URL in Drive setup card so user can copy-paste into Google Console
+  const urlEl=$('thisUrl');if(urlEl)urlEl.textContent=location.href.split('#')[0].split('?')[0];
   onMethod();renderRegister();calc();
 }
 init();
