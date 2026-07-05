@@ -221,7 +221,7 @@
         </div>
         <div>
           <label>&nbsp;</label>
-          <button class="btn-ghost mini" style="width:100%" onclick="nextInvNo()">Next #</button>
+          <button id="nextBtn" class="btn-ghost mini" style="width:100%" onclick="nextInvNo()">Next #</button>
         </div>
       </div>
       <div class="field">
@@ -330,11 +330,8 @@
       <div class="preview-head">
         <h2 style="margin:0">Live preview</h2>
         <div class="btnrow">
-          <button class="btn-ghost" onclick="downloadPDF()" title="Download named PDF to your device">⬇ Download PDF</button>
-          <button class="btn-ghost" id="driveBtn" onclick="saveToGDrive()" title="Save PDF to Google Drive folder">
-            <span id="driveIcon">☁</span> Save to Drive
-          </button>
-          <button class="btn-primary" onclick="finalisAndSave()">✔ Finalise &amp; Save</button>
+          <button class="btn-ghost" onclick="downloadPDF()" title="Download PDF to your device">⬇ Download PDF</button>
+          <button class="btn-primary" id="finaliseBtn" onclick="finalisAndSave()">✔ Finalise &amp; Save</button>
         </div>
       </div>
       <div class="paper-scroll">
@@ -634,20 +631,80 @@ function renderInvoice(r){
 }
 
 
-/* ---------- invoice number (sequential, auto-advance after save) ---------- */
-function buildInvNo(){
-  const last=store.get('last_invno')||'';
-  const m=last.match(/^(.*?)(\d+)$/);
-  if(m){const w=m[2].length;return m[1]+String(parseInt(m[2],10)+1).padStart(w,'0');}
-  const d=new Date();
-  return`${d.getFullYear()}/N/${String(d.getMonth()+1).padStart(2,'0')}/01`;
+/* ---------- invoice number — always derived from highest saved ---------- */
+let viewingOldInvoice = false; // true when form is loaded from register
+
+function highestSavedInvNo(){
+  // find the numerically highest invoice number across all saved invoices
+  const reg = store.get('register')||[];
+  let best = store.get('last_invno')||'';
+  let bestNum = extractSeqNum(best);
+  for(const x of reg){
+    const n = extractSeqNum(x.invno||'');
+    if(n > bestNum){ bestNum=n; best=x.invno; }
+  }
+  return best;
+}
+function extractSeqNum(invno){
+  // extract the trailing number from any invoice number pattern
+  const m = String(invno).match(/(\d+)$/);
+  return m ? parseInt(m[1],10) : 0;
+}
+function buildNextInvNo(){
+  const last = highestSavedInvNo();
+  if(!last) {
+    const d=new Date();
+    return`${d.getFullYear()}/N/${String(d.getMonth()+1).padStart(2,'0')}/01`;
+  }
+  const m = last.match(/^(.*?)(\d+)$/);
+  if(m){ const w=m[2].length; return m[1]+String(parseInt(m[2],10)+1).padStart(w,'0'); }
+  return last;
 }
 function nextInvNo(){
-  const cur=($('invno').value||'').trim();
-  const m=cur.match(/^(.*?)(\d+)$/);
-  if(m){const w=m[2].length;$('invno').value=m[1]+String(parseInt(m[2],10)+1).padStart(w,'0');}
-  else $('invno').value=buildInvNo();
+  // always jump to next after highest saved — ignores whatever is in the field
+  $('invno').value = buildNextInvNo();
+  setViewMode(false);
   calc();
+}
+
+function setViewMode(isViewing){
+  viewingOldInvoice = isViewing;
+  const btn = $('nextBtn');
+  const finalBtn = $('finaliseBtn');
+  const invnoField = $('invno');
+  if(isViewing){
+    // viewing old invoice — lock the number, show context
+    if(btn){ btn.textContent='New Invoice'; btn.title='Start a new invoice (will use next available number)'; }
+    if(finalBtn){ finalBtn.textContent='Re-save / Update'; }
+    // show a banner
+    let banner = $('viewBanner');
+    if(!banner){
+      banner=document.createElement('div');banner.id='viewBanner';
+      banner.style.cssText='background:#fff3e0;border:1px solid #f0d089;border-radius:8px;padding:8px 12px;font-size:12px;color:#7a5c08;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center';
+      invnoField.closest('.card').insertBefore(banner, invnoField.closest('.card').firstChild.nextSibling);
+    }
+    banner.innerHTML=`<span>📂 Viewing saved invoice — number is locked</span>
+      <button class="btn-ghost mini" onclick="startNewInvoice()" style="margin:0">✚ New Invoice</button>`;
+    banner.style.display='flex';
+  } else {
+    viewingOldInvoice = false;
+    if(btn){ btn.textContent='Next #'; btn.title='Advance to next invoice number'; }
+    if(finalBtn){ finalBtn.textContent='✔ Finalise & Save'; }
+    const banner=$('viewBanner');
+    if(banner) banner.style.display='none';
+  }
+}
+
+function startNewInvoice(){
+  // clear form, set next invoice number, exit view mode
+  $('invno').value=buildNextInvNo();
+  $('invdate').value=todayISO();
+  $('cust').value='';
+  $('amount').value='';
+  setViewMode(false);
+  calc();
+  window.scrollTo({top:0,behavior:'smooth'});
+  flash('New invoice started — fill in customer details.');
 }
 
 /* ---------- PDF filename ---------- */
@@ -695,22 +752,32 @@ function downloadPDF(){
 }
 
 /* ---------- Finalise & Save ---------- */
-function finalisAndSave(){
+async function finalisAndSave(){
   if(!$('invno').value.trim()){flash('Please enter an invoice number first.');return;}
   if(!$('cust').value.trim()){flash('Please enter customer name first.');return;}
   const reg=store.get('register')||[];
-  if(reg.some(x=>x.invno===$('invno').value)){
-    if(!confirm(`Invoice ${$('invno').value} already saved. Save again as duplicate?`))return;
+  const isDuplicate = reg.some(x=>x.invno===$('invno').value);
+  if(isDuplicate && !viewingOldInvoice){
+    if(!confirm(`Invoice ${$('invno').value} already saved. Overwrite it?`))return;
+    // remove old entry
+    const idx=reg.findIndex(x=>x.invno===$('invno').value);
+    if(idx>=0) reg.splice(idx,1);
   }
   const entry=snapshot();
   reg.unshift(entry);
   store.set('register',reg.slice(0,500));
-  store.set('last_invno',$('invno').value);
+  // always store the highest number seen
+  const curHighest = extractSeqNum(highestSavedInvNo());
+  const thisNum = extractSeqNum(entry.invno);
+  if(thisNum >= curHighest) store.set('last_invno', entry.invno);
   renderRegister();
   flash(`✔ Saved — ${entry.invno} · ${(entry.cust||'').toUpperCase()} · ₹${entry.total.toLocaleString('en-IN')}`);
   downloadPDF();
-  // auto-advance invoice number ready for next customer
-  nextInvNo();
+  // upload to Drive
+  saveToGDrive().then(()=>{}).catch(()=>{});
+  // advance to next number and exit view mode
+  $('invno').value = buildNextInvNo();
+  setViewMode(false);
 }
 
 /* ---------- Register ---------- */
@@ -748,6 +815,7 @@ function loadInvoice(i){
   $('cRate').value=x.cRate||'5';$('cShare').value=x.cShare||'100';$('cDesc').value=x.cDesc||'';
   let mth=x.method||'m1';if(mth==='7030'||mth==='flat5')mth='m1';
   $('method').value=mth;onMethod();setMode(x.mode||'total');$('amount').value=x.amount||'';
+  setViewMode(true); // lock invoice number — viewing old record
   calc();window.scrollTo({top:0,behavior:'smooth'});
 }
 function rePDF(i){loadInvoice(i);setTimeout(downloadPDF,400);}
@@ -1163,7 +1231,7 @@ function init(){
   const wasRedirect=handleOAuthRedirect();
   loadCompany();loadDriveConfig();
   $('invdate').value=todayISO();
-  $('invno').value=buildInvNo();
+  $('invno').value=buildNextInvNo();
   // Restore Drive session from localStorage if token still valid
   if(!wasRedirect){
     const savedUser=store.get('g_user');
