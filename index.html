@@ -1169,9 +1169,9 @@ async function saveToGDrive(){
     const form=new FormData();
     form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
     form.append('file', new Blob([fullHtml],{type:'text/html'}));
-    const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    const uploadRes=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
       {method:'POST',headers:{Authorization:'Bearer '+gToken},body:form});
-    const result=await r.json();
+    const result=await uploadRes.json();
 
     if(result.id){
       flash('✅ Invoice saved to Drive → Invoices/ (opens as Google Doc)',5000);
