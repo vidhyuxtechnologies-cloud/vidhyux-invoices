@@ -367,12 +367,39 @@
         <div class="hint" style="margin-top:8px">Your invoices will be saved as PDFs inside the folder above. Works from any device once signed in.</div>
       </div>
       <div id="driveConnected" style="display:none">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <span style="font-size:20px">✅</span>
           <span id="driveUser" style="font-weight:600;color:var(--ok)"></span>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Folder: <b id="driveFolderName"></b></div>
-        <button class="btn-ghost mini" onclick="gSignOut()">Disconnect</button>
+        <!-- folder structure -->
+        <div style="background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px">
+          <div style="font-weight:700;color:var(--brand);margin-bottom:6px">📁 <span id="driveFolderName"></span></div>
+          <div style="padding-left:16px;color:var(--muted);line-height:2">
+            <div>📂 Invoices &nbsp;<span style="color:#8a94a3;font-size:11px">— tax invoices saved here</span></div>
+            <div>📂 Master Tracker &nbsp;<span style="color:#8a94a3;font-size:11px">— synced Excel files go here</span></div>
+            <div>📂 Scripts &nbsp;<span style="color:#8a94a3;font-size:11px">— sync_master.py lives here</span></div>
+          </div>
+        </div>
+        <!-- upload other files -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px">Upload files to Drive folder:</div>
+          <div class="btnrow" style="flex-wrap:wrap">
+            <label class="btn-ghost mini" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+              📊 Master Tracker Excel
+              <input type="file" accept=".xlsx" style="display:none" onchange="uploadFileToDrive(event,'Master Tracker')">
+            </label>
+            <label class="btn-ghost mini" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+              🐍 Sync Script (.py)
+              <input type="file" accept=".py" style="display:none" onchange="uploadFileToDrive(event,'Scripts')">
+            </label>
+            <label class="btn-ghost mini" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+              📄 Any file
+              <input type="file" style="display:none" onchange="uploadFileToDrive(event,'Master Tracker')">
+            </label>
+          </div>
+        </div>
+        <div id="driveUploadStatus" style="font-size:11.5px;color:var(--ok);min-height:18px"></div>
+        <button class="btn-ghost mini" onclick="gSignOut()" style="margin-top:6px">Disconnect</button>
       </div>
     </div>
 
@@ -764,8 +791,8 @@ function showDriveConnected(email){
   if($('driveIcon'))$('driveIcon').textContent='✅';
 }
 function gSignOut(){
-  gToken=null;gFolderId=null;
-  ['g_token','g_refresh','g_user','g_verifier','g_folder_id'].forEach(k=>localStorage.removeItem(k));
+  gToken=null; folderCache={};
+  ['g_token','g_refresh','g_user','g_verifier'].forEach(k=>localStorage.removeItem(k));
   if($('driveSetup'))$('driveSetup').style.display='block';
   if($('driveConnected'))$('driveConnected').style.display='none';
   if($('driveStatus'))$('driveStatus').textContent='— not connected';
@@ -832,65 +859,108 @@ async function ensureToken(){
   flash('Drive session expired — please reconnect.',3000);
   return false;
 }
-async function getOrCreateFolder(name){
-  // Don't cache folder ID across sessions — Drive file scope limits listing
-  const q=`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
-    {headers:{Authorization:'Bearer '+gToken}});
-  const d=await r.json();
-  if(d.files&&d.files.length){gFolderId=d.files[0].id;return gFolderId;}
-  const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',
-    headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},
-    body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder'})});
-  const cd=await cr.json();
-  gFolderId=cd.id;return gFolderId;
+/* ── Drive folder cache ─────────────────────────────────────────────────── */
+// folderCache: { 'Vidhyux Invoices': id, 'Vidhyux Invoices/Invoices': id, … }
+let folderCache = {};
+
+async function getDriveFolderId(pathParts){
+  // pathParts e.g. ['Vidhyux Invoices'] or ['Vidhyux Invoices','Invoices']
+  const key = pathParts.join('/');
+  if(folderCache[key]) return folderCache[key];
+
+  let parentId = 'root';
+  for(let i=0;i<pathParts.length;i++){
+    const name = pathParts[i];
+    const cacheKey = pathParts.slice(0,i+1).join('/');
+    if(folderCache[cacheKey]){ parentId=folderCache[cacheKey]; continue; }
+
+    // search inside parentId
+    const q=`name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+      {headers:{Authorization:'Bearer '+gToken}});
+    const d=await r.json();
+    if(d.files&&d.files.length){
+      folderCache[cacheKey]=d.files[0].id;
+      parentId=d.files[0].id;
+    } else {
+      // create
+      const cr=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',
+        headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},
+        body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[parentId]})});
+      const cd=await cr.json();
+      folderCache[cacheKey]=cd.id;
+      parentId=cd.id;
+    }
+  }
+  return folderCache[key];
 }
+
+async function uploadBlobToDrive(blob, filename, subfolder){
+  // subfolder = 'Invoices' | 'Master Tracker' | 'Scripts'
+  const rootFolder = store.get('g_folder')||'Vidhyux Invoices';
+  const fid = await getDriveFolderId([rootFolder, subfolder]);
+  const meta = {name:filename, parents:[fid], mimeType:blob.type||'application/octet-stream'};
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file', blob);
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+    {method:'POST', headers:{Authorization:'Bearer '+gToken}, body:form});
+  return await r.json();
+}
+
 async function saveToGDrive(){
   if(!await ensureToken()){
     if(confirm('Drive session expired. Reconnect now?'))gSignIn();
     return;
   }
-  const folder=store.get('g_folder')||'Vidhyux Invoices';
-  flash('Uploading to Drive…');
+  flash('Uploading invoice to Drive…');
   try{
-    // Step 1: get/create folder
-    let fid;
-    try{fid=await getOrCreateFolder(folder);}
-    catch(e){flash('❌ Folder error: '+e.message,6000);console.error('folder err',e);return;}
-    console.log('Folder ID:',fid);
-
     const inv=$('invoice').outerHTML;
     const css=document.querySelector('style').textContent;
     const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>${css}body{background:#f4f7fc;padding:20px;margin:0}</style></head>
 <body>${inv}</body></html>`;
     const filename=pdfName().replace('.pdf','.html');
-    const meta={name:filename,parents:[fid],mimeType:'text/html'};
-    const form=new FormData();
-    form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
-    form.append('file',new Blob([fullHtml],{type:'text/html'}));
-
-    // Step 2: upload
-    const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
-      {method:'POST',headers:{Authorization:'Bearer '+gToken},body:form});
-    const result=await r.json();
-    console.log('Drive upload result:',JSON.stringify(result));
-
+    const blob=new Blob([fullHtml],{type:'text/html'});
+    const result=await uploadBlobToDrive(blob, filename, 'Invoices');
     if(result.id){
-      flash('✅ Saved to Drive: '+filename,5000);
+      flash('✅ Invoice saved to Drive → Invoices/',5000);
+      window.open(result.webViewLink,'_blank');
       const reg=store.get('register')||[];
       const idx=reg.findIndex(x=>x.invno===$('invno').value);
       if(idx>=0){reg[idx].driveUrl=result.webViewLink;store.set('register',reg);renderRegister();}
-    }else{
-      // Show the FULL error in a persistent alert so we can read it
-      const msg=result.error?`${result.error.code}: ${result.error.message}`:'Unknown error — check console (F12)';
-      flash('❌ Drive error: '+msg, 8000);
+    } else {
+      const msg=result.error?`${result.error.code}: ${result.error.message}`:'Unknown — check F12';
+      flash('❌ '+msg, 8000);
       alert('Drive upload failed:\n\n'+JSON.stringify(result,null,2));
+    }
+  }catch(e){ flash('❌ '+e.message,6000); alert('Drive exception:\n'+e.message); }
+}
+
+async function uploadFileToDrive(event, subfolder){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!await ensureToken()){flash('Connect to Drive first.');return;}
+  const el = $('driveUploadStatus');
+  if(el) el.textContent = `Uploading ${file.name}…`;
+  flash(`Uploading ${file.name} to Drive…`);
+  try{
+    const result = await uploadBlobToDrive(file, file.name, subfolder);
+    if(result.id){
+      const msg = `✅ ${file.name} → ${subfolder}/`;
+      flash(msg, 5000);
+      if(el){ el.textContent=msg; el.style.color='var(--ok)'; }
+      // clear file input so same file can be re-uploaded
+      event.target.value='';
+    } else {
+      const msg='❌ '+(result.error&&result.error.message)||'Upload failed';
+      flash(msg,6000);
+      if(el){el.textContent=msg;el.style.color='var(--accent-d)';}
+      alert(JSON.stringify(result,null,2));
     }
   }catch(e){
     flash('❌ '+e.message,6000);
-    alert('Drive exception:\n\n'+e.message);
-    console.error(e);
+    if(el){el.textContent='❌ '+e.message;el.style.color='var(--accent-d)';}
   }
 }
 
