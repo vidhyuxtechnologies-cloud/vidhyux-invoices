@@ -242,7 +242,34 @@
     .gst-badge{border-color:#1a3a6e;color:#1a3a6e;background:#e8f0fe}
   }
 
-  @media print{
+  /* portal import */
+  .portal-card{background:var(--card);border:2px solid var(--accent);border-radius:12px;padding:16px;margin-bottom:16px}
+  .portal-card h2{color:var(--accent-d);margin:0 0 10px}
+  .portal-list{list-style:none;padding:0;margin:8px 0 0;max-height:320px;overflow-y:auto}
+  .portal-list li{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;
+    border-radius:8px;cursor:pointer;border:1px solid var(--line);margin-bottom:5px;
+    transition:background .15s;
+  }
+  .portal-list li:hover{background:var(--warn-bg);border-color:var(--accent)}
+  .portal-list li.selected{background:#fff3e0;border-color:var(--accent-d)}
+  .portal-kwp{
+    background:#0f2244;color:#fff;border-radius:5px;
+    padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap;flex:0 0 auto;
+  }
+  .portal-name{font-weight:600;font-size:13px;color:var(--ink);flex:1}
+  .portal-meta{font-size:10.5px;color:var(--muted);margin-top:1px}
+  .portal-stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .portal-stat{background:var(--soft);border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--ink)}
+  .portal-stat b{color:var(--brand)}
+  .portal-filter{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .portal-filter button{font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
+  .portal-filter button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .imp-btn{
+    background:var(--accent);color:#2a1e04;border:1px solid var(--accent-d);
+    border-radius:8px;padding:9px 14px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;
+  }
+  .imp-btn:hover{background:var(--accent-d)}
     body{background:#fff !important}
     .topbar,.wrap>div:first-child,.preview-head,.notice-print-hide,
     #driveCard,#__toast,.card:not(.preview-card){display:none!important}
@@ -274,7 +301,30 @@
 <div class="wrap">
   <!-- ============ LEFT: FORM ============ -->
   <div>
-    <div class="notice notice-print-hide">
+    <!-- PORTAL IMPORT CARD -->
+    <div class="portal-card notice-print-hide">
+      <h2>📥 Portal Import</h2>
+      <div id="portalUploadArea">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">
+          Upload today's Excel from the national portal — app will show all <b>Installation Pending</b> customers ready to invoice.
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--soft);border:2px dashed var(--line);border-radius:8px;padding:14px;font-size:13px;color:var(--brand)">
+          <span style="font-size:24px">📊</span>
+          <span><b>Click to upload portal Excel</b><br><span style="font-size:11px;color:var(--muted)">My_Applications_List_*.xlsx from the national portal</span></span>
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="loadPortalExcel(event)">
+        </label>
+      </div>
+      <div id="portalLoaded" style="display:none">
+        <div class="portal-stats" id="portalStats"></div>
+        <div class="portal-filter" id="portalFilter"></div>
+        <input id="portalSearch" placeholder="🔍 Search by name…" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px" oninput="filterPortalList()">
+        <ul class="portal-list" id="portalList"></ul>
+        <button class="imp-btn" id="portalImportBtn" onclick="importSelected()" disabled style="opacity:.5">
+          ↳ Load selected customer into invoice form
+        </button>
+        <button class="btn-ghost mini" onclick="clearPortal()" style="width:100%;margin-top:6px">✕ Clear &amp; upload different file</button>
+      </div>
+    </div>
       <b>GST note (from 22 Sep 2025):</b> Solar cells &amp; the solar power generating system are now <b>5%</b> (was 12%).
       Installation-as-service is 18%. Two treatments exist — pick your method below and confirm with your CA which one your PM Surya Ghar contracts use.
     </div>
@@ -810,11 +860,67 @@ function snapshot(){
 }
 
 /* ---------- Download PDF ---------- */
+function showPrintTip(onConfirm){
+  // show only once ever
+  if(store.get('print_tip_seen')) { onConfirm(); return; }
+  // build modal
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:14px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
+      <div style="background:#0f2244;padding:18px 22px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">🖨️</span>
+        <div>
+          <div style="color:#fff;font-weight:800;font-size:15px">One-time print tip</div>
+          <div style="color:#a8c4e8;font-size:11px">Enable this once in Chrome — stays on forever</div>
+        </div>
+      </div>
+      <div style="padding:20px 22px">
+        <p style="margin:0 0 14px;font-size:13.5px;color:#1a2236;line-height:1.6">
+          To get the <b>colourful invoice</b> (navy header, orange accents) when saving as PDF,
+          enable <b>Background graphics</b> in Chrome's print dialog:
+        </p>
+        <div style="background:#f4f7fc;border-radius:10px;padding:14px 16px;margin-bottom:16px">
+          <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+            <span style="background:#0f2244;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:0 0 auto">1</span>
+            <span style="font-size:13px;color:#1a2236">Print dialog opens → click <b>"More settings"</b></span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+            <span style="background:#0f2244;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:0 0 auto">2</span>
+            <span style="font-size:13px;color:#1a2236">Tick <b>"Background graphics"</b> ✅</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span style="background:#e8921a;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:0 0 auto">3</span>
+            <span style="font-size:13px;color:#1a2236">Click <b>Save</b> — colours will appear. Done forever ✔</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button onclick="
+            store.set('print_tip_seen',true);
+            document.body.removeChild(this.closest('[style*=fixed]'));
+            window._printTipCallback&&window._printTipCallback();
+          " style="flex:1;background:#0f2244;color:#fff;border:0;border-radius:8px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer">
+            Got it — Print now
+          </button>
+          <button onclick="
+            document.body.removeChild(this.closest('[style*=fixed]'));
+          " style="background:#f4f7fc;color:#555;border:1px solid #dce6f5;border-radius:8px;padding:11px 14px;font-size:13px;cursor:pointer">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>`;
+  window._printTipCallback = onConfirm;
+  document.body.appendChild(overlay);
+}
+
 function downloadPDF(){
-  const prev=document.title;
-  document.title=pdfName();
-  window.print();
-  setTimeout(()=>document.title=prev,1000);
+  showPrintTip(()=>{
+    const prev=document.title;
+    document.title=pdfName();
+    window.print();
+    setTimeout(()=>document.title=prev,1000);
+  });
 }
 
 /* ---------- Finalise & Save ---------- */
@@ -1292,6 +1398,175 @@ function flash(msg,ms=3000){
 }
 
 /* ---------- init ---------- */
+/* ═══════════════════════════════════════════════════════
+   PORTAL IMPORT
+   ═══════════════════════════════════════════════════════ */
+let portalData = [];      // all rows from uploaded Excel
+let portalFiltered = [];  // currently displayed rows
+let portalSelected = null;// selected row object
+let portalKwpFilter = 'all';
+
+async function loadPortalExcel(event){
+  const file = event.target.files[0];
+  if(!file){ return; }
+  flash('Reading portal Excel…');
+  // Use SheetJS via CDN
+  if(!window.XLSX){
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  }
+  const buf = await file.arrayBuffer();
+  const wb  = XLSX.read(buf, {type:'array'});
+  const ws  = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+  // normalise keys (trim whitespace)
+  portalData = rows.map(r=>{
+    const n={};
+    Object.keys(r).forEach(k=>n[k.trim()]=String(r[k]).trim());
+    return n;
+  }).filter(r=>r['Application Number']&&r['Application Number'].startsWith('NP'));
+
+  if(!portalData.length){ flash('No valid rows found — is this the right file?',4000); return; }
+
+  $('portalUploadArea').style.display='none';
+  $('portalLoaded').style.display='block';
+  renderPortalStats();
+  renderPortalFilter();
+  filterPortalList();
+  flash(`✅ Loaded ${portalData.length} applications from portal`);
+}
+
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=src; s.onload=res; s.onerror=rej;
+    document.head.appendChild(s);
+  });
+}
+
+function renderPortalStats(){
+  const total   = portalData.length;
+  const pending = portalData.filter(r=>r['Status']==='Installation (Pending)').length;
+  const inspect = portalData.filter(r=>r['Status']==='Inspection (Pending)').length;
+  const done    = portalData.filter(r=>r['Status']==='Subsidy Disbursal (Disbursed)').length;
+  $('portalStats').innerHTML=`
+    <div class="portal-stat">Total: <b>${total}</b></div>
+    <div class="portal-stat" style="background:#fff3e0;color:#7a5c08">Invoice Ready: <b>${pending}</b></div>
+    <div class="portal-stat">Inspection: <b>${inspect}</b></div>
+    <div class="portal-stat" style="background:#e6f4ea;color:#1f7a4d">Completed: <b>${done}</b></div>`;
+}
+
+function renderPortalFilter(){
+  // unique kWp values among install-pending
+  const kwps = [...new Set(
+    portalData
+      .filter(r=>r['Status']==='Installation (Pending)')
+      .map(r=>parseFloat(r['Proposed Capacity (kWp)']||0))
+      .filter(Boolean)
+  )].sort((a,b)=>a-b);
+
+  let html=`<button class="${portalKwpFilter==='all'?'on':''}" onclick="setPortalKwp('all')">All kWp</button>`;
+  kwps.forEach(k=>{
+    html+=`<button class="${portalKwpFilter==k?'on':''}" onclick="setPortalKwp(${k})">${k} kW</button>`;
+  });
+  $('portalFilter').innerHTML=html;
+}
+
+function setPortalKwp(val){
+  portalKwpFilter=val; renderPortalFilter(); filterPortalList();
+}
+
+function filterPortalList(){
+  const q=($('portalSearch').value||'').toLowerCase().trim();
+  // always show Install Pending — optionally show others too
+  portalFiltered = portalData.filter(r=>{
+    const status = r['Status']||'';
+    if(status!=='Installation (Pending)') return false;
+    if(portalKwpFilter!=='all'){
+      const kw=parseFloat(r['Proposed Capacity (kWp)']||0);
+      if(Math.abs(kw-parseFloat(portalKwpFilter))>0.01) return false;
+    }
+    if(q && !(r['Consumer Name']||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderPortalList();
+}
+
+function renderPortalList(){
+  const ul=$('portalList');
+  if(!portalFiltered.length){
+    ul.innerHTML=`<li style="cursor:default;color:var(--muted);border:0">No matching customers found.</li>`;
+    setPortalSelected(null); return;
+  }
+  ul.innerHTML=portalFiltered.map((r,i)=>{
+    const kw=parseFloat(r['Proposed Capacity (kWp)']||0);
+    const isSelected = portalSelected&&portalSelected['Application Number']===r['Application Number'];
+    return`<li class="${isSelected?'selected':''}" onclick="setPortalSelected(portalFiltered[${i}])">
+      <span class="portal-kwp">${kw} kW</span>
+      <div style="flex:1;min-width:0">
+        <div class="portal-name">${r['Consumer Name']||'—'}</div>
+        <div class="portal-meta">${r['Application Number']} &nbsp;·&nbsp; 📞 ${r['Mobile No.']||'—'} &nbsp;·&nbsp; ${r['Submitted On']||''}</div>
+      </div>
+      ${isSelected?'<span style="color:var(--accent-d);font-size:18px;font-weight:700">✔</span>':''}
+    </li>`;
+  }).join('');
+}
+
+function setPortalSelected(row){
+  portalSelected=row;
+  const btn=$('portalImportBtn');
+  if(row){
+    btn.disabled=false; btn.style.opacity='1';
+    btn.textContent=`↳ Load "${row['Consumer Name']}" into invoice form`;
+  } else {
+    btn.disabled=true; btn.style.opacity='.5';
+    btn.textContent='↳ Load selected customer into invoice form';
+  }
+  renderPortalList();
+}
+
+function importSelected(){
+  if(!portalSelected) return;
+  const r = portalSelected;
+  const kw = parseFloat(r['Proposed Capacity (kWp)']||0);
+
+  // fill customer
+  $('cust').value = (r['Consumer Name']||'').trim();
+
+  // fill solar system from kWp
+  $('invKw').value  = kw || '';
+  // panel qty: roughly kWp / 0.56 panels (550W average) — staff can adjust
+  const panelQty = kw ? Math.round(kw / 0.555) : '';
+  $('panelQty').value = panelQty;
+
+  // store application number in invno note — visible for reference
+  // also set today's date
+  $('invdate').value = todayISO();
+
+  // scroll to invoice form and highlight
+  $('cust').scrollIntoView({behavior:'smooth', block:'center'});
+  $('cust').style.transition='background .4s';
+  $('cust').style.background='#fff3e0';
+  setTimeout(()=>$('cust').style.background='',1200);
+
+  // flash with app number for reference
+  flash(`✅ Loaded: ${r['Consumer Name']} — ${kw} kW · App: ${r['Application Number']}`, 5000);
+
+  // store app number for reference (shown in invoice remarks or for record)
+  portalSelected._loaded = true;
+  $('portalImportBtn').textContent='✔ Loaded — fill amount & finalise';
+
+  calc();
+}
+
+function clearPortal(){
+  portalData=[]; portalFiltered=[]; portalSelected=null;
+  $('portalUploadArea').style.display='block';
+  $('portalLoaded').style.display='none';
+  $('portalSearch').value='';
+  portalKwpFilter='all';
+}
+
 function init(){
   // Handle OAuth token in hash FIRST before anything clears it
   const wasRedirect=handleOAuthRedirect();
