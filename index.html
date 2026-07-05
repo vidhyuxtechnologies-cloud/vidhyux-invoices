@@ -896,9 +896,22 @@ async function getDriveFolderId(pathParts){
 }
 
 async function uploadBlobToDrive(blob, filename, subfolder){
-  // subfolder = 'Invoices' | 'Master Tracker' | 'Scripts'
   const rootFolder = store.get('g_folder')||'Vidhyux Invoices';
   const fid = await getDriveFolderId([rootFolder, subfolder]);
+
+  // check if file already exists — delete it first to avoid duplicates
+  const q=`name='${filename}' and '${fid}' in parents and trashed=false`;
+  const existing=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+    {headers:{Authorization:'Bearer '+gToken}});
+  const ed=await existing.json();
+  if(ed.files&&ed.files.length){
+    // delete all existing copies with this name
+    for(const f of ed.files){
+      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`,
+        {method:'DELETE',headers:{Authorization:'Bearer '+gToken}});
+    }
+  }
+
   const meta = {name:filename, parents:[fid], mimeType:blob.type||'application/octet-stream'};
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
