@@ -930,14 +930,52 @@ async function saveToGDrive(){
   try{
     const inv=$('invoice').outerHTML;
     const css=document.querySelector('style').textContent;
+    // Wrap in clean printable HTML
     const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>${css}body{background:#f4f7fc;padding:20px;margin:0}</style></head>
+<style>
+${css}
+body{background:#fff;padding:0;margin:0}
+.topbar,.wrap>div:first-child,.preview-head,.notice-print-hide,
+#driveCard,.card:not(.preview-card){display:none!important}
+.wrap{display:block;padding:0;max-width:none}
+.card.preview-card{border:0;padding:0;margin:0;box-shadow:none}
+.invoice{width:100%;box-shadow:none;border-radius:0}
+</style></head>
 <body>${inv}</body></html>`;
-    const filename=pdfName().replace('.pdf','.html');
-    const blob=new Blob([fullHtml],{type:'text/html'});
-    const result=await uploadBlobToDrive(blob, filename, 'Invoices');
+
+    const filename = pdfName().replace('.pdf','');  // base name without extension
+
+    // Upload HTML → Google auto-converts to Google Doc (renders properly, printable as PDF)
+    const rootFolder = store.get('g_folder')||'Vidhyux Invoices';
+    const fid = await getDriveFolderId([rootFolder,'Invoices']);
+
+    // delete existing file with same name first
+    const q=`'${fid}' in parents and trashed=false and (name='${filename}' or name='${filename}.html')`;
+    const existingR=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+      {headers:{Authorization:'Bearer '+gToken}});
+    const existingD=await existingR.json();
+    if(existingD.files&&existingD.files.length){
+      for(const f of existingD.files){
+        await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`,
+          {method:'DELETE',headers:{Authorization:'Bearer '+gToken}});
+      }
+    }
+
+    // upload as HTML, Google converts to Google Doc
+    const meta={
+      name: filename,
+      parents:[fid],
+      mimeType:'application/vnd.google-apps.document'  // tells Drive to convert HTML → Google Doc
+    };
+    const form=new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
+    form.append('file', new Blob([fullHtml],{type:'text/html'}));
+    const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+      {method:'POST',headers:{Authorization:'Bearer '+gToken},body:form});
+    const result=await r.json();
+
     if(result.id){
-      flash('✅ Invoice saved to Drive → Invoices/',5000);
+      flash('✅ Invoice saved to Drive → Invoices/ (opens as Google Doc)',5000);
       window.open(result.webViewLink,'_blank');
       const reg=store.get('register')||[];
       const idx=reg.findIndex(x=>x.invno===$('invno').value);
