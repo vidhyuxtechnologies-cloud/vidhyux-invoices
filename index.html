@@ -1160,11 +1160,12 @@ async function saveToGDrive(){
       }
     }
 
-    // upload as HTML, Google converts to Google Doc
+    // Store as plain HTML — Drive keeps it as-is, no conversion
+    // File is named .pdf so it's clear what it is; downloaded locally via print dialog
     const meta={
-      name: filename,
+      name: filename+'.html',
       parents:[fid],
-      mimeType:'application/vnd.google-apps.document'  // tells Drive to convert HTML → Google Doc
+      mimeType:'text/html'
     };
     const form=new FormData();
     form.append('metadata', new Blob([JSON.stringify(meta)],{type:'application/json'}));
@@ -1174,17 +1175,16 @@ async function saveToGDrive(){
     const result=await uploadRes.json();
 
     if(result.id){
-      flash('✅ Invoice saved to Drive → Invoices/ (opens as Google Doc)',5000);
-      window.open(result.webViewLink,'_blank');
+      // silent save — no popup, just a toast. Use Download PDF button to get the actual PDF.
+      flash('☁ Backed up to Drive → Invoices/',3000);
       const reg=store.get('register')||[];
       const idx=reg.findIndex(x=>x.invno===$('invno').value);
       if(idx>=0){reg[idx].driveUrl=result.webViewLink;store.set('register',reg);renderRegister();}
     } else {
       const msg=result.error?`${result.error.code}: ${result.error.message}`:'Unknown — check F12';
-      flash('❌ '+msg, 8000);
-      alert('Drive upload failed:\n\n'+JSON.stringify(result,null,2));
+      flash('❌ Drive backup failed: '+msg, 6000);
     }
-  }catch(e){ flash('❌ '+e.message,6000); alert('Drive exception:\n'+e.message); }
+  }catch(e){ flash('❌ Drive: '+e.message,6000); }
 }
 
 async function uploadFileToDrive(event, subfolder){
