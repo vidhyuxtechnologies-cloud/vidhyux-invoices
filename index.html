@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v6-06072026 -->
+<!-- v7-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -392,7 +392,7 @@
         </div>
       </div>
       <div class="field row">
-        <div><label>HSN / SAC</label><input id="hsn" value="854140"></div>
+        <div><label>HSN (goods) — 854143 = solar panels/SPGS</label><input id="hsn" value="854143"></div>
         <div><label>Panel warranty (yrs, 80% output)</label><input id="wPanel" value="25"></div>
       </div>
       <div class="field">
@@ -697,11 +697,11 @@ function renderInvoice(r){
     bank:$('coBank').value,acc:$('coAcc').value,ifs:$('coIfs').value};
   const panel=`${$('panelBrand').value||'—'}, ${$('panelQty').value||'—'}qty`;
   const inv=`${$('invBrand').value||'—'} ${$('invKw').value||'—'}kw, ${$('invPhase').value}`;
-  const hsn=$('hsn').value||'854140';
+  const hsn=$('hsn').value||'854143';
   const panelBrandRaw = $('panelBrand').value||'—';
   const panelBrandDisplay = normaliseBrand(panelBrandRaw);
   const invBrandDisplay = $('invBrand').value||'—';
-  const goodsDesc=`On grid Solar Panel and Inverter<br>Panel: ${panelBrandDisplay}, ${$('panelQty').value||'—'}qty<br>Inverter: ${invBrandDisplay} ${$('invKw').value||'—'}kW, ${$('invPhase').value}<br>Warranty:<br>Panel: ${$('wPanel').value} years of 80% output<br>Inverter: ${$('wInv').value} Years`;
+  const goodsDesc=`Supply of On-Grid Solar Power Generating System<br>Panel: ${panelBrandDisplay}, ${$('panelQty').value||'—'}qty<br>Inverter: ${invBrandDisplay} ${$('invKw').value||'—'}kW, ${$('invPhase').value}<br>Warranty:<br>Panel: ${$('wPanel').value} years of 80% output<br>Inverter: ${$('wInv').value} Years`;
   const customDesc=($('cDesc')&&$('cDesc').value.trim())?$('cDesc').value.replace(/\n/g,'<br>'):goodsDesc;
 
   // item rows (one per leg)
@@ -710,16 +710,16 @@ function renderInvoice(r){
     let mainDesc,subDesc,showHsn,qty;
     if(l.kind==='service'){
       const kw=$('invKw').value,ph=$('invPhase').value;
-      mainDesc=`Installation of ${kw||'—'} kW Solar System (${ph})`;
+      mainDesc=`Installation of ${kw||'—'} kW Solar Power Generating System (${ph})`;
       subDesc=`On-grid rooftop installation, wiring &amp; commissioning`;
-      showHsn='';qty='1';
+      showHsn='995461';qty='1';
     }else if(l.kind==='custom'){
       mainDesc=$('cDesc').value||'Solar Supply';subDesc='';showHsn=hsn;qty='1';
     }else{
       const pb=normaliseBrand($('panelBrand').value||'—');
       const ib=$('invBrand').value||'—';
-      mainDesc=`${pb} Solar Panel &amp; ${ib} Inverter`;
-      subDesc=`Panel: ${$('panelQty').value||'—'} nos × ${$('panelWp').value||'—'} Wp &nbsp;|&nbsp; Inverter: ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) &nbsp;|&nbsp; Inverter: ${$('wInv').value} yrs`;
+      mainDesc=`Supply of On-Grid Solar Power Generating System`;
+      subDesc=`Panel: ${pb}, ${$('panelQty').value||'—'} nos × ${$('panelWp').value||'—'} Wp &nbsp;|&nbsp; Inverter: ${ib}, ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) &nbsp;|&nbsp; Inverter: ${$('wInv').value} yrs`;
       showHsn=hsn;qty='1';
     }
     items+=`<tr>
@@ -847,10 +847,10 @@ function renderInvoice(r){
       <div class="role">Authorized Signatory</div>
     </div>
   </div>
-  <div class="inv-decl">We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</div>
+  <div class="inv-decl">We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.${$('method').value!=='custom'?' Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).':''}</div>
   <div class="inv-gsttag">
-    <span>Company VATTIN: &nbsp;</span>
-    <span>Company CST No: &nbsp;</span>
+    <span>Tax payable on reverse charge: <b>No</b></span>
+    <span>Place of Supply: <b>Maharashtra (27)</b></span>
     <span>Subject to Yavatmal Jurisdiction</span>
   </div>`;
 }
@@ -1106,7 +1106,7 @@ function loadInvoice(i){
   $('serialPaste').value='';
   $('panelBrand').value=x.panelBrand||'';$('panelQty').value=x.panelQty||'';
   $('invBrand').value=x.invBrand||'';$('invKw').value=x.invKw||'';$('invPhase').value=x.invPhase||'1 Ph';
-  $('hsn').value=x.hsn||'854140';$('wPanel').value=x.wPanel||'25';$('wInv').value=x.wInv||'07';
+  $('hsn').value=x.hsn||'854143';$('wPanel').value=x.wPanel||'25';$('wInv').value=x.wInv||'07';
   $('cRate').value=x.cRate||'5';$('cShare').value=x.cShare||'100';$('cDesc').value=x.cDesc||'';
   let mth=x.method||'m1';if(mth==='7030'||mth==='flat5')mth='m1';
   $('method').value=mth;onMethod();setMode(x.mode||'total');$('amount').value=x.amount||'';
@@ -1303,14 +1303,14 @@ async function saveToGDrive(){
       let mainDesc,subDesc,showHsn,qty;
       if(l.kind==='service'){
         const kw=$('invKw').value,ph=$('invPhase').value;
-        mainDesc=`Installation of ${kw||'—'} kW Solar System (${ph})`;
+        mainDesc=`Installation of ${kw||'—'} kW Solar Power Generating System (${ph})`;
         subDesc='On-grid rooftop installation, wiring & commissioning';
-        showHsn='';qty='1';
+        showHsn='995461';qty='1';
       }else if(l.kind==='custom'){
         mainDesc=$('cDesc').value||'Solar Supply';subDesc='';showHsn=$('hsn').value;qty='1';
       }else{
-        mainDesc='On-grid Solar Panel & Inverter';
-        subDesc=`Panel: ${$('panelBrand').value||'—'} ${$('panelQty').value||'—'} nos | Inverter: ${$('invBrand').value||'—'} ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) | Inverter: ${$('wInv').value} yrs`;
+        mainDesc='Supply of On-Grid Solar Power Generating System';
+        subDesc=`Panel: ${normaliseBrand($('panelBrand').value||'—')}, ${$('panelQty').value||'—'} nos | Inverter: ${$('invBrand').value||'—'}, ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) | Inverter: ${$('wInv').value} yrs`;
         showHsn=$('hsn').value;qty='1';
       }
       const rowBg = i%2===0?'#ffffff':'#f9fbff';
@@ -1438,10 +1438,10 @@ async function saveToGDrive(){
 
   <!-- DECLARATION -->
   <div style="padding:10px 24px;font-size:10.5px;color:#8a94a3;background:#f9fbff;border-top:1px solid #e8edf6;text-align:center">
-    We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+    We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.${$('method').value!=='custom'?' Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).':''}
   </div>
   <div style="padding:8px 24px 14px;font-size:11px;color:#5b6b7f;background:#f9fbff">
-    &#8226; Company VATTIN: &nbsp;&nbsp; &#8226; Company CST No: &nbsp;&nbsp; &#8226; Subject to Yavatmal Jurisdiction
+    &#8226; Tax payable on reverse charge: <b>No</b> &nbsp;&nbsp; &#8226; Place of Supply: <b>Maharashtra (27)</b> &nbsp;&nbsp; &#8226; Subject to Yavatmal Jurisdiction
   </div>
 
 </div>
