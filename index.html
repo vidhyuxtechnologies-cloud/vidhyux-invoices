@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v10-06072026 -->
+<!-- v11-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1003,25 +1003,73 @@ async function finalisAndSave(){
   const isDuplicate = reg.some(x=>x.invno===$('invno').value);
   if(isDuplicate && !viewingOldInvoice){
     if(!confirm(`Invoice ${$('invno').value} already saved. Overwrite it?`))return;
-    // remove old entry
     const idx=reg.findIndex(x=>x.invno===$('invno').value);
     if(idx>=0) reg.splice(idx,1);
   }
   const entry=snapshot();
   reg.unshift(entry);
   store.set('register',reg.slice(0,500));
-  // always store the highest number seen
   const curHighest = extractSeqNum(highestSavedInvNo());
   const thisNum = extractSeqNum(entry.invno);
   if(thisNum >= curHighest) store.set('last_invno', entry.invno);
   renderRegister();
   flash(`✔ Saved — ${entry.invno} · ${(entry.cust||'').toUpperCase()} · ₹${entry.total.toLocaleString('en-IN')}`);
   downloadPDF();
-  // upload to Drive
+  // upload invoice PDF to Drive
   saveToGDrive().then(()=>{}).catch(()=>{});
+  // sync register to Drive JSON (for master Excel sync)
+  syncRegisterToDrive().then(()=>{}).catch(()=>{});
   // advance to next number and exit view mode
   $('invno').value = buildNextInvNo();
   setViewMode(false);
+}
+
+/* ---------- Sync register to Drive as JSON ---------- */
+async function syncRegisterToDrive(){
+  if(!await ensureToken()) return; // silently skip if not connected
+  try{
+    const rootFolder = store.get('g_folder')||'Vidhyux Invoices';
+    const fid = await getDriveFolderId([rootFolder]);
+    // build a clean register for the sync script — only fields needed for master update
+    const reg = store.get('register')||[];
+    const syncData = {
+      exported: new Date().toISOString(),
+      device: navigator.userAgent.slice(0,50),
+      invoices: reg.map(x=>({
+        invno:       x.invno||'',
+        date:        x.date||'',
+        cust:        x.cust||'',
+        consumerNo:  x.consumerNo||'',
+        portalAppNo: x.portalAppNo||'',
+        custMobile:  x.custMobile||'',
+        total:       x.total||0,
+        method:      x.method||'',
+        driveUrl:    x.driveUrl||'',
+        ts:          x.ts||0
+      }))
+    };
+    const blob = new Blob([JSON.stringify(syncData,null,2)],{type:'application/json'});
+    // overwrite the same file every time — single source of truth
+    const filename = 'invoice_register.json';
+    // delete existing first
+    const q=`name='${filename}' and '${fid}' in parents and trashed=false`;
+    const er=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)`,
+      {headers:{Authorization:'Bearer '+gToken}});
+    const ed=await er.json();
+    if(ed.files&&ed.files.length){
+      for(const f of ed.files){
+        await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`,
+          {method:'DELETE',headers:{Authorization:'Bearer '+gToken}});
+      }
+    }
+    const meta={name:filename,parents:[fid],mimeType:'application/json'};
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+    form.append('file',blob);
+    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {method:'POST',headers:{Authorization:'Bearer '+gToken},body:form});
+    // no toast — silent background sync
+  }catch(e){ console.warn('Register sync to Drive failed:',e.message); }
 }
 
 /* ---------- Register ---------- */
