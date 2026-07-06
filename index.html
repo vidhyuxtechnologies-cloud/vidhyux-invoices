@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5-06072026 -->
+<!-- v6-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -764,26 +764,27 @@ function renderInvoice(r){
   <div class="inv-consignee">
     <span class="tag">Bill To</span>
     <div style="flex:1;padding:10px 16px;border-left:3px solid #e8921a">
-      <div style="font-weight:800;font-size:14px;color:#111">${($('cust').value||'—').toUpperCase()}</div>
-      ${$('custAddr').value?`<div style="font-size:11.5px;color:#333;margin-top:2px">${$('custAddr').value}</div>`:''}
-      <div style="font-size:11px;color:#444;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap">
-        ${$('consumerNo').value?`<span>Consumer No: <b>${$('consumerNo').value}</b></span>`:''}
-        ${$('custMobile').value?`<span>Mobile: <b>${$('custMobile').value}</b></span>`:''}
-        ${$('portalAppNo').value?`<span>Portal ID: <b>${$('portalAppNo').value}</b></span>`:''}
-      </div>
+      <div style="font-weight:800;font-size:14px;color:#111;letter-spacing:.3px">${($('cust').value||'—').toUpperCase()}</div>
+      ${$('custAddr').value?`<div style="font-size:11.5px;color:#333;margin-top:3px">${$('custAddr').value}</div>`:''}
+      ${($('consumerNo').value||$('custMobile').value||$('portalAppNo').value)?`
+      <div style="border-top:1px solid #ddd;margin-top:6px;padding-top:6px;font-size:11px;color:#444;display:flex;gap:20px;flex-wrap:wrap">
+        ${$('consumerNo').value?`<span>Consumer No: <b style="color:#111">${$('consumerNo').value}</b></span>`:''}
+        ${$('custMobile').value?`<span>Mobile: <b style="color:#111">${$('custMobile').value}</b></span>`:''}
+        ${$('portalAppNo').value?`<span>Portal ID: <b style="color:#111">${$('portalAppNo').value}</b></span>`:''}
+      </div>`:''}
     </div>
   </div>
   <table class="inv-items">
     <thead>
       <tr>
-        <th class="c" style="width:36px">Sr.</th>
-        <th style="text-align:left">Description of Goods / Services</th>
-        <th class="c" style="width:72px">HSN/SAC</th>
-        <th class="c" style="width:38px">Qty</th>
-        <th class="r" style="width:90px">Rate (&#8377;)</th>
-        <th class="c" style="width:54px">CGST</th>
-        <th class="c" style="width:54px">SGST</th>
-        <th class="r" style="width:90px">Amount (&#8377;)</th>
+        <th class="c" style="width:36px;background:#1a1a2e;color:#f5c028;font-weight:800">Sr.</th>
+        <th style="text-align:left;background:#1a1a2e;color:#fff">Description of Goods / Services</th>
+        <th class="c" style="width:72px;background:#1a1a2e;color:#fff">HSN/SAC</th>
+        <th class="c" style="width:38px;background:#1a1a2e;color:#fff">Qty</th>
+        <th class="r" style="width:90px;background:#1a1a2e;color:#fff">Rate (&#8377;)</th>
+        <th class="c" style="width:54px;background:#e8921a;color:#fff;font-weight:800">CGST</th>
+        <th class="c" style="width:54px;background:#e8921a;color:#fff;font-weight:800">SGST</th>
+        <th class="r" style="width:90px;background:#1a1a2e;color:#f5c028;font-weight:800">Amount (&#8377;)</th>
       </tr>
     </thead>
     <tbody>${items}</tbody>
@@ -1368,9 +1369,18 @@ async function saveToGDrive(){
   <div style="height:4px;background:linear-gradient(90deg,#f5c028,#e8921a,#f5c028)"></div>
 
   <!-- BILL TO -->
-  <div style="background:#f4f7fc;padding:11px 24px;border-bottom:1px solid #dce6f5">
-    <span style="background:#1a3a6e;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;padding:3px 9px;border-radius:20px;margin-right:10px">Bill To</span>
-    <span style="font-weight:700;font-size:14px;color:#0f2244">${($('cust').value||'—').toUpperCase()}</span>
+  <div style="background:#f4f7fc;padding:11px 24px;border-bottom:1px solid #dce6f5;display:flex;align-items:flex-start;gap:0">
+    <span style="background:#0f2244;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;padding:3px 9px;border-radius:20px;margin-right:14px;white-space:nowrap;margin-top:3px">Bill To</span>
+    <div style="border-left:3px solid #e8921a;padding-left:12px;flex:1">
+      <div style="font-weight:800;font-size:14px;color:#0f2244;letter-spacing:.3px">${($('cust').value||'—').toUpperCase()}</div>
+      ${$('custAddr').value?`<div style="font-size:11.5px;color:#333;margin-top:3px">${$('custAddr').value}</div>`:''}
+      ${($('consumerNo').value||$('custMobile').value||$('portalAppNo').value)?`
+      <div style="border-top:1px solid #ddd;margin-top:6px;padding-top:6px;font-size:11px;color:#444;display:flex;gap:20px;flex-wrap:wrap">
+        ${$('consumerNo').value?`<span>Consumer No: <b style="color:#111">${$('consumerNo').value}</b></span>`:''}
+        ${$('custMobile').value?`<span>Mobile: <b style="color:#111">${$('custMobile').value}</b></span>`:''}
+        ${$('portalAppNo').value?`<span>Portal ID: <b style="color:#111">${$('portalAppNo').value}</b></span>`:''}
+      </div>`:''}
+    </div>
   </div>
 
   <!-- ITEMS TABLE -->
