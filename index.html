@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3-06072026 -->
+<!-- v4-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -358,6 +358,10 @@
         <label>Name</label>
         <input id="cust" placeholder="e.g. RADELAL BHAIYLAL JAYASWAL">
       </div>
+      <div class="field">
+        <label>Consumer Address</label>
+        <input id="custAddr" placeholder="e.g. Wadgaon Road Yavatmal 445001">
+      </div>
       <div class="field row">
         <div>
           <label>Consumer Number</label>
@@ -403,8 +407,18 @@
         <textarea id="serialPaste" placeholder="Open customer's application details on the vendor portal → press Ctrl+A then Ctrl+C → paste here. Auto-fills: name, mobile, consumer no, app no, inverter, brands, qty &amp; ALL serial numbers." style="min-height:70px;font-size:12px" oninput="parseSerials()"></textarea>
         <div class="hint">One paste fills the whole form. Verify the fields after pasting.</div>
       </div>
+      <div class="field row">
+        <div>
+          <label>Panel capacity (Wp each)</label>
+          <input id="panelWp" placeholder="e.g. 620" inputmode="numeric" oninput="calc()">
+        </div>
+        <div>
+          <label>Inverter capacity (kVA)</label>
+          <input id="invKva" placeholder="e.g. 3.600" inputmode="decimal" oninput="calc()">
+        </div>
+      </div>
       <div class="field">
-        <label>Panel serial numbers (comma or line separated)</label>
+        <label>Panel serial numbers (comma separated)</label>
         <textarea id="panelSerials" placeholder="e.g. AD615-2312-00123, AD615-2312-00124, …" style="min-height:56px;font-size:12px" oninput="calc()"></textarea>
       </div>
       <div class="field">
@@ -602,6 +616,19 @@ function inWords(n){
   return out.trim();
 }
 
+/* ---------- brand normaliser — Adani markets Mundra & Goldi ---------- */
+function normaliseBrand(raw){
+  if(!raw) return raw;
+  // brands manufactured by / marketed as Adani
+  const adaniBrands = /mundra|goldi\s*sun|goldi|adani\s*solar|adani\s*green/i;
+  // split by + (multiple brands), normalise each
+  return raw.split('+').map(b=>{
+    const t=b.trim();
+    return adaniBrands.test(t) ? 'Adani' : t;
+  }).filter((v,i,a)=>a.indexOf(v)===i) // dedupe
+    .join(' + ');
+}
+
 /* ---------- mode / method ---------- */
 function setMode(m){
   mode=m;
@@ -671,7 +698,10 @@ function renderInvoice(r){
   const panel=`${$('panelBrand').value||'—'}, ${$('panelQty').value||'—'}qty`;
   const inv=`${$('invBrand').value||'—'} ${$('invKw').value||'—'}kw, ${$('invPhase').value}`;
   const hsn=$('hsn').value||'854140';
-  const goodsDesc=`On grid Solar Panel and Inverter<br>Panel: ${panel}<br>Inverter: ${inv}<br>Warranty:<br>Panel: ${$('wPanel').value} years of 80% output<br>Inverter: ${$('wInv').value} Years`;
+  const panelBrandRaw = $('panelBrand').value||'—';
+  const panelBrandDisplay = normaliseBrand(panelBrandRaw);
+  const invBrandDisplay = $('invBrand').value||'—';
+  const goodsDesc=`On grid Solar Panel and Inverter<br>Panel: ${panelBrandDisplay}, ${$('panelQty').value||'—'}qty<br>Inverter: ${invBrandDisplay} ${$('invKw').value||'—'}kW, ${$('invPhase').value}<br>Warranty:<br>Panel: ${$('wPanel').value} years of 80% output<br>Inverter: ${$('wInv').value} Years`;
   const customDesc=($('cDesc')&&$('cDesc').value.trim())?$('cDesc').value.replace(/\n/g,'<br>'):goodsDesc;
 
   // item rows (one per leg)
@@ -686,8 +716,10 @@ function renderInvoice(r){
     }else if(l.kind==='custom'){
       mainDesc=$('cDesc').value||'Solar Supply';subDesc='';showHsn=hsn;qty='1';
     }else{
-      mainDesc=`On-grid Solar Panel &amp; Inverter`;
-      subDesc=`Panel: ${$('panelBrand').value||'—'} ${$('panelQty').value||'—'} nos &nbsp;|&nbsp; Inverter: ${$('invBrand').value||'—'} ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) &nbsp;|&nbsp; Inverter: ${$('wInv').value} yrs`;
+      const pb=normaliseBrand($('panelBrand').value||'—');
+      const ib=$('invBrand').value||'—';
+      mainDesc=`${pb} Solar Panel &amp; ${ib} Inverter`;
+      subDesc=`Panel: ${$('panelQty').value||'—'} nos × ${$('panelWp').value||'—'} Wp &nbsp;|&nbsp; Inverter: ${$('invKw').value||'—'} kW, ${$('invPhase').value}<br>Warranty — Panel: ${$('wPanel').value} yrs (80% output) &nbsp;|&nbsp; Inverter: ${$('wInv').value} yrs`;
       showHsn=hsn;qty='1';
     }
     items+=`<tr>
@@ -733,6 +765,7 @@ function renderInvoice(r){
     <span class="tag">Bill To</span>
     <div style="flex:1;padding:10px 16px;border-left:3px solid #e8921a">
       <div style="font-weight:800;font-size:14px;color:#111">${($('cust').value||'—').toUpperCase()}</div>
+      ${$('custAddr').value?`<div style="font-size:11.5px;color:#333;margin-top:2px">${$('custAddr').value}</div>`:''}
       <div style="font-size:11px;color:#444;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap">
         ${$('consumerNo').value?`<span>Consumer No: <b>${$('consumerNo').value}</b></span>`:''}
         ${$('custMobile').value?`<span>Mobile: <b>${$('custMobile').value}</b></span>`:''}
@@ -759,10 +792,36 @@ function renderInvoice(r){
     <table>${tax}</table>
   </div>
   ${($('panelSerials').value.trim()||$('invSerial').value.trim())?`
-  <div style="padding:10px 20px;border-top:1px solid #ccc;font-size:10.5px;color:#111">
-    <div style="font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;color:#111">Equipment Serial Numbers</div>
-    ${$('panelSerials').value.trim()?`<div style="margin-bottom:3px;line-height:1.7"><b>Panel${$('panelSerials').value.includes(',')?'s':''}:</b> ${$('panelSerials').value.trim()}</div>`:''}
-    ${$('invSerial').value.trim()?`<div><b>Inverter:</b> ${$('invSerial').value.trim()}</div>`:''}
+  <div style="padding:10px 20px 12px;border-top:1px solid #ccc;font-size:10.5px;color:#111">
+    <div style="font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;color:#111;border-bottom:1px solid #ddd;padding-bottom:4px">Equipment Details</div>
+    <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+      ${$('panelSerials').value.trim()?`
+      <tr style="border-bottom:1px solid #eee">
+        <td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;width:120px">Solar Panels</td>
+        <td style="padding:4px 8px">
+          <span style="margin-right:12px">Qty: <b>${$('panelQty').value||'—'}</b></span>
+          <span style="margin-right:12px">Capacity: <b>${$('panelWp').value||'—'} Wp each</b></span>
+          <span>Make: <b>${normaliseBrand($('panelBrand').value||'—')}</b></span>
+        </td>
+      </tr>
+      <tr style="border-bottom:1px solid #eee">
+        <td style="padding:4px 8px 4px 0;color:#555">Serial Nos.</td>
+        <td style="padding:4px 8px;line-height:1.8">${$('panelSerials').value.trim().split(',').map((s,i)=>`<span style="display:inline-block;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:1px 6px;margin:1px 3px 1px 0;font-family:monospace;font-size:10px">${i+1}. ${s.trim()}</span>`).join('')}</td>
+      </tr>`:''}
+      ${$('invSerial').value.trim()?`
+      <tr style="border-bottom:1px solid #eee">
+        <td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap">Inverter</td>
+        <td style="padding:4px 8px">
+          <span style="margin-right:12px">Qty: <b>1</b></span>
+          <span style="margin-right:12px">Capacity: <b>${$('invKva').value||$('invKw').value||'—'} kVA</b></span>
+          <span>Make: <b>${$('invBrand').value||'—'}</b></span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:4px 8px 4px 0;color:#555">Serial No.</td>
+        <td style="padding:4px 8px"><span style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:1px 6px;font-family:monospace;font-size:10px">${$('invSerial').value.trim()}</span></td>
+      </tr>`:''}
+    </table>
   </div>`:''}
   <div class="inv-grand">
     <div>
@@ -865,8 +924,9 @@ function startNewInvoice(){
   $('invno').value=buildNextInvNo();
   $('invdate').value=todayISO();
   $('cust').value='';
-  $('consumerNo').value='';$('custMobile').value='';$('portalAppNo').value='';
-  $('panelSerials').value='';$('invSerial').value='';$('serialPaste').value='';
+  $('consumerNo').value='';$('custMobile').value='';$('portalAppNo').value='';$('custAddr').value='';
+  $('panelSerials').value='';$('invSerial').value='';$('panelWp').value='';$('invKva').value='';
+  $('serialPaste').value='';
   $('amount').value='';
   setViewMode(false);
   calc();
@@ -902,8 +962,10 @@ function loadCompany(){const c=store.get('company');if(c)Object.keys(c).forEach(
 function snapshot(){
   const r=compute();
   return{invno:$('invno').value,date:$('invdate').value,cust:$('cust').value,
-    consumerNo:$('consumerNo').value,custMobile:$('custMobile').value,portalAppNo:$('portalAppNo').value,
+    consumerNo:$('consumerNo').value,custMobile:$('custMobile').value,
+    portalAppNo:$('portalAppNo').value,custAddr:$('custAddr').value,
     panelSerials:$('panelSerials').value,invSerial:$('invSerial').value,
+    panelWp:$('panelWp').value,invKva:$('invKva').value,
     total:Math.round(r.total),
     method:$('method').value,mode,amount:$('amount').value,
     cRate:$('cRate').value,cShare:$('cShare').value,cDesc:$('cDesc').value,
@@ -1036,8 +1098,11 @@ function loadInvoice(i){
   const x=(store.get('register')||[])[i];if(!x)return;
   $('invno').value=x.invno||'';$('invdate').value=x.date||todayISO();
   $('cust').value=x.cust||'';
-  $('consumerNo').value=x.consumerNo||'';$('custMobile').value=x.custMobile||'';$('portalAppNo').value=x.portalAppNo||'';
-  $('panelSerials').value=x.panelSerials||'';$('invSerial').value=x.invSerial||'';$('serialPaste').value='';
+  $('consumerNo').value=x.consumerNo||'';$('custMobile').value=x.custMobile||'';
+  $('portalAppNo').value=x.portalAppNo||'';$('custAddr').value=x.custAddr||'';
+  $('panelSerials').value=x.panelSerials||'';$('invSerial').value=x.invSerial||'';
+  $('panelWp').value=x.panelWp||'';$('invKva').value=x.invKva||'';
+  $('serialPaste').value='';
   $('panelBrand').value=x.panelBrand||'';$('panelQty').value=x.panelQty||'';
   $('invBrand').value=x.invBrand||'';$('invKw').value=x.invKw||'';$('invPhase').value=x.invPhase||'1 Ph';
   $('hsn').value=x.hsn||'854140';$('wPanel').value=x.wPanel||'25';$('wInv').value=x.wInv||'07';
@@ -1592,6 +1657,7 @@ function importSelected(){
   $('consumerNo').value = (r['Consumer Number']||'').trim();
   $('custMobile').value = (r['Mobile No.']||'').trim();
   $('portalAppNo').value= (r['Application Number']||'').trim();
+  $('custAddr').value   = '';
 
   // fill solar system from kWp
   $('invKw').value  = kw || '';
@@ -1657,9 +1723,15 @@ function parseSerials(){
   const cano = (grab('Consumer Account Number (CA No.)').match(/\d{10,13}/)||[''])[0];
   if(cano){ $('consumerNo').value = cano; filled.push('Consumer No'); }
 
-  // ── inverter capacity & phase ──
+  // ── address ──
+  const addr = grab('Address of Premises for installation');
+  const pin  = (grab('Pincode').match(/\d{6}/)||[''])[0];
+  if(addr && addr!=='-'){
+    $('custAddr').value = addr + (pin?' '+pin:'');
+    filled.push('Address');
+  }
   const invKva = (grab('Total Inverter Capacity (kVA)').match(/[\d.]+/)||[''])[0];
-  if(invKva){ $('invKw').value = parseFloat(invKva); filled.push('Inverter kW'); }
+  if(invKva){ $('invKw').value = parseFloat(invKva); $('invKva').value = parseFloat(invKva); filled.push('Inverter kW'); }
   const phase = grab('Solar Connection Type');
   if(phase){ $('invPhase').value = /three/i.test(phase) ? '3 Ph' : '1 Ph'; }
 
@@ -1694,7 +1766,11 @@ function parseSerials(){
     });
     if(brands.length){ $('panelBrand').value=[...new Set(brands)].join(' + '); filled.push('Panel brand'); }
     if(qty){ $('panelQty').value=qty; filled.push('Panel qty: '+qty); }
-    // if table parse failed but serials found, use serial count as qty
+    // panel Wp — from capacity column
+    const wpMatch = pvSec.match(/(\d+)\.000\s*\d+\s*[A-Z]/);
+    const wpVal = wpMatch ? wpMatch[1] : (pvLines[0]||'').split(/\t+/)[2]||'';
+    const wp = parseInt(wpVal);
+    if(wp>0){ $('panelWp').value=wp; filled.push('Panel Wp: '+wp); }
     if(!qty && serials.length){ $('panelQty').value=serials.length; }
   }
 
@@ -1721,7 +1797,8 @@ function init(){
       gToken=savedToken;showDriveConnected(savedUser);
     }
   }
-  ['invno','invdate','cust','consumerNo','custMobile','portalAppNo','panelBrand','panelQty','invBrand','invKw','invPhase','hsn','wPanel','wInv',
+  ['invno','invdate','cust','custAddr','consumerNo','custMobile','portalAppNo',
+   'panelBrand','panelQty','panelWp','invBrand','invKw','invKva','invPhase','hsn','wPanel','wInv',
    'coName','coAddr','coEmail','coGst','coBank','coAcc','coIfs'].forEach(id=>{
     const el=$(id);if(el)el.addEventListener('input',calc);
   });
