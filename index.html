@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4-06072026 -->
+<!-- v5-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -413,7 +413,7 @@
           <input id="panelWp" placeholder="e.g. 620" inputmode="numeric" oninput="calc()">
         </div>
         <div>
-          <label>Inverter capacity (kVA)</label>
+          <label>Inverter capacity (kW)</label>
           <input id="invKva" placeholder="e.g. 3.600" inputmode="decimal" oninput="calc()">
         </div>
       </div>
@@ -813,7 +813,7 @@ function renderInvoice(r){
         <td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap">Inverter</td>
         <td style="padding:4px 8px">
           <span style="margin-right:12px">Qty: <b>1</b></span>
-          <span style="margin-right:12px">Capacity: <b>${$('invKva').value||$('invKw').value||'—'} kVA</b></span>
+          <span style="margin-right:12px">Capacity: <b>${$('invKva').value||$('invKw').value||'—'} kW</b></span>
           <span>Make: <b>${$('invBrand').value||'—'}</b></span>
         </td>
       </tr>
