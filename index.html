@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-   <!-- v2 -->
+<!-- v3-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -397,6 +397,23 @@
     </div>
 
     <div class="card">
+      <h2>Equipment Serial Numbers</h2>
+      <div class="field">
+        <label>📋 Paste entire portal page (Ctrl+A → Ctrl+C on application details)</label>
+        <textarea id="serialPaste" placeholder="Open customer's application details on the vendor portal → press Ctrl+A then Ctrl+C → paste here. Auto-fills: name, mobile, consumer no, app no, inverter, brands, qty &amp; ALL serial numbers." style="min-height:70px;font-size:12px" oninput="parseSerials()"></textarea>
+        <div class="hint">One paste fills the whole form. Verify the fields after pasting.</div>
+      </div>
+      <div class="field">
+        <label>Panel serial numbers (comma or line separated)</label>
+        <textarea id="panelSerials" placeholder="e.g. AD615-2312-00123, AD615-2312-00124, …" style="min-height:56px;font-size:12px" oninput="calc()"></textarea>
+      </div>
+      <div class="field">
+        <label>Inverter serial number</label>
+        <input id="invSerial" placeholder="e.g. PLYC5K-2024-98765" oninput="calc()">
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Amount &amp; GST</h2>
 
       <div class="field">
@@ -741,6 +758,12 @@ function renderInvoice(r){
   <div class="inv-tax">
     <table>${tax}</table>
   </div>
+  ${($('panelSerials').value.trim()||$('invSerial').value.trim())?`
+  <div style="padding:10px 20px;border-top:1px solid #ccc;font-size:10.5px;color:#111">
+    <div style="font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;color:#111">Equipment Serial Numbers</div>
+    ${$('panelSerials').value.trim()?`<div style="margin-bottom:3px;line-height:1.7"><b>Panel${$('panelSerials').value.includes(',')?'s':''}:</b> ${$('panelSerials').value.trim()}</div>`:''}
+    ${$('invSerial').value.trim()?`<div><b>Inverter:</b> ${$('invSerial').value.trim()}</div>`:''}
+  </div>`:''}
   <div class="inv-grand">
     <div>
       <div class="words-lbl">Amount in Words</div>
@@ -843,6 +866,7 @@ function startNewInvoice(){
   $('invdate').value=todayISO();
   $('cust').value='';
   $('consumerNo').value='';$('custMobile').value='';$('portalAppNo').value='';
+  $('panelSerials').value='';$('invSerial').value='';$('serialPaste').value='';
   $('amount').value='';
   setViewMode(false);
   calc();
@@ -879,6 +903,7 @@ function snapshot(){
   const r=compute();
   return{invno:$('invno').value,date:$('invdate').value,cust:$('cust').value,
     consumerNo:$('consumerNo').value,custMobile:$('custMobile').value,portalAppNo:$('portalAppNo').value,
+    panelSerials:$('panelSerials').value,invSerial:$('invSerial').value,
     total:Math.round(r.total),
     method:$('method').value,mode,amount:$('amount').value,
     cRate:$('cRate').value,cShare:$('cShare').value,cDesc:$('cDesc').value,
@@ -1012,6 +1037,7 @@ function loadInvoice(i){
   $('invno').value=x.invno||'';$('invdate').value=x.date||todayISO();
   $('cust').value=x.cust||'';
   $('consumerNo').value=x.consumerNo||'';$('custMobile').value=x.custMobile||'';$('portalAppNo').value=x.portalAppNo||'';
+  $('panelSerials').value=x.panelSerials||'';$('invSerial').value=x.invSerial||'';$('serialPaste').value='';
   $('panelBrand').value=x.panelBrand||'';$('panelQty').value=x.panelQty||'';
   $('invBrand').value=x.invBrand||'';$('invKw').value=x.invKw||'';$('invPhase').value=x.invPhase||'1 Ph';
   $('hsn').value=x.hsn||'854140';$('wPanel').value=x.wPanel||'25';$('wInv').value=x.wInv||'07';
@@ -1599,6 +1625,85 @@ function clearPortal(){
   $('portalLoaded').style.display='none';
   $('portalSearch').value='';
   portalKwpFilter='all';
+}
+
+/* ═══════════════════════════════════════════════════════
+   PORTAL PAGE PARSER — paste the entire application detail
+   page (Ctrl+A, Ctrl+C on the portal) and everything fills.
+   Tested against the real PM Surya Ghar vendor portal format.
+   ═══════════════════════════════════════════════════════ */
+function parseSerials(){
+  const raw = $('serialPaste').value;
+  if(!raw.trim()) return;
+
+  const grab = (label) => {
+    const esc = label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re = new RegExp(esc + '\\s*:?\\s*\\t*([^\\t\\n]+)','i');
+    const m = raw.match(re);
+    return m ? m[1].trim() : '';
+  };
+
+  const filled = [];
+
+  // ── application number ──
+  const appNo = (raw.match(/NP-[A-Z]+\d*-\d+/)||[''])[0];
+  if(appNo){ $('portalAppNo').value = appNo; filled.push('App No'); }
+
+  // ── name / mobile / consumer no ──
+  const name = grab('Full Name of Premises Owner Person');
+  if(name && name!=='-'){ $('cust').value = name; filled.push('Name'); }
+  const mobile = (grab('Mobile').match(/\d{10}/)||[''])[0];
+  if(mobile){ $('custMobile').value = mobile; filled.push('Mobile'); }
+  const cano = (grab('Consumer Account Number (CA No.)').match(/\d{10,13}/)||[''])[0];
+  if(cano){ $('consumerNo').value = cano; filled.push('Consumer No'); }
+
+  // ── inverter capacity & phase ──
+  const invKva = (grab('Total Inverter Capacity (kVA)').match(/[\d.]+/)||[''])[0];
+  if(invKva){ $('invKw').value = parseFloat(invKva); filled.push('Inverter kW'); }
+  const phase = grab('Solar Connection Type');
+  if(phase){ $('invPhase').value = /three/i.test(phase) ? '3 Ph' : '1 Ph'; }
+
+  // ── inverter table: between "Serial Number of Inverter" and PV section ──
+  const invSecRaw = raw.split(/Serial Number of Inverter/i)[1]||'';
+  const invSec = invSecRaw.split(/Manufacturer of PV Module|Sr\.?\s?No\./i)[0]||invSecRaw;
+  const invTokens = invSec.split(/[\s\t]+/).filter(Boolean);
+  const invBrand = invTokens.find(t=>/^[A-Za-z]{3,}$/.test(t))||'';
+  if(invBrand){ $('invBrand').value = invBrand.charAt(0)+invBrand.slice(1).toLowerCase(); filled.push('Inverter brand'); }
+  const invSerial = invTokens.find(t=>t.length>=12 && /\d/.test(t) && /[A-Za-z]/.test(t))||'';
+  if(invSerial){ $('invSerial').value = invSerial; filled.push('Inverter serial'); }
+
+  // ── PV module section: serials, brands, total qty ──
+  const pvSec = (raw.split(/Serial Number of PV Module/i)[1]||'').split(/Documents/i)[0];
+  if(pvSec){
+    const pvTokens = pvSec.split(/[\s\t]+/).filter(Boolean);
+    const serials = pvTokens.filter(t=>
+      t.length>=10 && /[A-Za-z]/.test(t) && /\d/.test(t) && !/^[\d.]+$/.test(t)
+      && !/Limited|Private|Solar|Module|Quantity/i.test(t)
+    );
+    if(serials.length){ $('panelSerials').value = serials.join(', '); filled.push(serials.length+' panel serials'); }
+
+    // brands + qty from table rows
+    const pvLines = pvSec.split('\n').filter(l=>/^\s*\d+[\t ]/.test(l));
+    const brands=[]; let qty=0;
+    pvLines.forEach(l=>{
+      const cols=l.split(/\t+/).map(s=>s.trim()).filter(Boolean);
+      if(cols.length>=4){
+        brands.push(cols[1].replace(/\s*(PV\s*)?(Private\s*)?Limited\s*$/i,'').trim());
+        qty += parseInt(cols[3])||0;
+      }
+    });
+    if(brands.length){ $('panelBrand').value=[...new Set(brands)].join(' + '); filled.push('Panel brand'); }
+    if(qty){ $('panelQty').value=qty; filled.push('Panel qty: '+qty); }
+    // if table parse failed but serials found, use serial count as qty
+    if(!qty && serials.length){ $('panelQty').value=serials.length; }
+  }
+
+  if(filled.length){
+    flash('✅ Auto-filled: '+filled.join(' · '), 6000);
+  } else {
+    flash('Could not detect portal fields — check the pasted text or fill manually.',4000);
+  }
+  calc();
 }
 
 function init(){
