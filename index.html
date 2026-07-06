@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-   <!-- v2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -358,6 +357,20 @@
         <label>Name</label>
         <input id="cust" placeholder="e.g. RADELAL BHAIYLAL JAYASWAL">
       </div>
+      <div class="field row">
+        <div>
+          <label>Consumer Number</label>
+          <input id="consumerNo" placeholder="e.g. 378170669901">
+        </div>
+        <div>
+          <label>Mobile No.</label>
+          <input id="custMobile" placeholder="e.g. 9876543210" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field">
+        <label>National Portal Application No.</label>
+        <input id="portalAppNo" placeholder="e.g. NP-MHSED26-13590308">
+      </div>
     </div>
 
     <div class="card">
@@ -700,7 +713,14 @@ function renderInvoice(r){
   </div>
   <div class="inv-consignee">
     <span class="tag">Bill To</span>
-    <span class="name">${($('cust').value||'—').toUpperCase()}</span>
+    <div style="flex:1;padding:10px 16px;border-left:3px solid #e8921a">
+      <div style="font-weight:800;font-size:14px;color:#111">${($('cust').value||'—').toUpperCase()}</div>
+      <div style="font-size:11px;color:#444;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap">
+        ${$('consumerNo').value?`<span>Consumer No: <b>${$('consumerNo').value}</b></span>`:''}
+        ${$('custMobile').value?`<span>Mobile: <b>${$('custMobile').value}</b></span>`:''}
+        ${$('portalAppNo').value?`<span>Portal ID: <b>${$('portalAppNo').value}</b></span>`:''}
+      </div>
+    </div>
   </div>
   <table class="inv-items">
     <thead>
@@ -821,6 +841,7 @@ function startNewInvoice(){
   $('invno').value=buildNextInvNo();
   $('invdate').value=todayISO();
   $('cust').value='';
+  $('consumerNo').value='';$('custMobile').value='';$('portalAppNo').value='';
   $('amount').value='';
   setViewMode(false);
   calc();
@@ -855,7 +876,9 @@ function loadCompany(){const c=store.get('company');if(c)Object.keys(c).forEach(
 /* ---------- snapshot current form ---------- */
 function snapshot(){
   const r=compute();
-  return{invno:$('invno').value,date:$('invdate').value,cust:$('cust').value,total:Math.round(r.total),
+  return{invno:$('invno').value,date:$('invdate').value,cust:$('cust').value,
+    consumerNo:$('consumerNo').value,custMobile:$('custMobile').value,portalAppNo:$('portalAppNo').value,
+    total:Math.round(r.total),
     method:$('method').value,mode,amount:$('amount').value,
     cRate:$('cRate').value,cShare:$('cShare').value,cDesc:$('cDesc').value,
     panelBrand:$('panelBrand').value,panelQty:$('panelQty').value,
@@ -985,7 +1008,9 @@ function renderRegister(){
 }
 function loadInvoice(i){
   const x=(store.get('register')||[])[i];if(!x)return;
-  $('invno').value=x.invno||'';$('invdate').value=x.date||todayISO();$('cust').value=x.cust||'';
+  $('invno').value=x.invno||'';$('invdate').value=x.date||todayISO();
+  $('cust').value=x.cust||'';
+  $('consumerNo').value=x.consumerNo||'';$('custMobile').value=x.custMobile||'';$('portalAppNo').value=x.portalAppNo||'';
   $('panelBrand').value=x.panelBrand||'';$('panelQty').value=x.panelQty||'';
   $('invBrand').value=x.invBrand||'';$('invKw').value=x.invKw||'';$('invPhase').value=x.invPhase||'1 Ph';
   $('hsn').value=x.hsn||'854140';$('wPanel').value=x.wPanel||'25';$('wInv').value=x.wInv||'07';
@@ -1450,22 +1475,22 @@ function loadScript(src){
 }
 
 function renderPortalStats(){
-  const total   = portalData.length;
-  const pending = portalData.filter(r=>r['Status']==='Installation (Pending)').length;
-  const inspect = portalData.filter(r=>r['Status']==='Inspection (Pending)').length;
-  const done    = portalData.filter(r=>r['Status']==='Subsidy Disbursal (Disbursed)').length;
+  const total    = portalData.length;
+  const inspect  = portalData.filter(r=>r['Status']==='Inspection (Pending)').length;
+  const install  = portalData.filter(r=>r['Status']==='Installation (Pending)').length;
+  const done     = portalData.filter(r=>r['Status']==='Subsidy Disbursal (Disbursed)').length;
   $('portalStats').innerHTML=`
     <div class="portal-stat">Total: <b>${total}</b></div>
-    <div class="portal-stat" style="background:#fff3e0;color:#7a5c08">Invoice Ready: <b>${pending}</b></div>
-    <div class="portal-stat">Inspection: <b>${inspect}</b></div>
+    <div class="portal-stat" style="background:#fff3e0;color:#7a5c08">Invoice Ready (Inspection): <b>${inspect}</b></div>
+    <div class="portal-stat">Installation Pending: <b>${install}</b></div>
     <div class="portal-stat" style="background:#e6f4ea;color:#1f7a4d">Completed: <b>${done}</b></div>`;
 }
 
 function renderPortalFilter(){
-  // unique kWp values among install-pending
+  // unique kWp values among Inspection Pending customers
   const kwps = [...new Set(
     portalData
-      .filter(r=>r['Status']==='Installation (Pending)')
+      .filter(r=>r['Status']==='Inspection (Pending)')
       .map(r=>parseFloat(r['Proposed Capacity (kWp)']||0))
       .filter(Boolean)
   )].sort((a,b)=>a-b);
@@ -1483,10 +1508,10 @@ function setPortalKwp(val){
 
 function filterPortalList(){
   const q=($('portalSearch').value||'').toLowerCase().trim();
-  // always show Install Pending — optionally show others too
+  // show Inspection Pending — these are the ones ready for invoicing
   portalFiltered = portalData.filter(r=>{
     const status = r['Status']||'';
-    if(status!=='Installation (Pending)') return false;
+    if(status!=='Inspection (Pending)') return false;
     if(portalKwpFilter!=='all'){
       const kw=parseFloat(r['Proposed Capacity (kWp)']||0);
       if(Math.abs(kw-parseFloat(portalKwpFilter))>0.01) return false;
@@ -1535,8 +1560,11 @@ function importSelected(){
   const r = portalSelected;
   const kw = parseFloat(r['Proposed Capacity (kWp)']||0);
 
-  // fill customer
-  $('cust').value = (r['Consumer Name']||'').trim();
+  // fill customer fields from portal data
+  $('cust').value       = (r['Consumer Name']||'').trim();
+  $('consumerNo').value = (r['Consumer Number']||'').trim();
+  $('custMobile').value = (r['Mobile No.']||'').trim();
+  $('portalAppNo').value= (r['Application Number']||'').trim();
 
   // fill solar system from kWp
   $('invKw').value  = kw || '';
@@ -1587,7 +1615,7 @@ function init(){
       gToken=savedToken;showDriveConnected(savedUser);
     }
   }
-  ['invno','invdate','cust','panelBrand','panelQty','invBrand','invKw','invPhase','hsn','wPanel','wInv',
+  ['invno','invdate','cust','consumerNo','custMobile','portalAppNo','panelBrand','panelQty','invBrand','invKw','invPhase','hsn','wPanel','wInv',
    'coName','coAddr','coEmail','coGst','coBank','coAcc','coIfs'].forEach(id=>{
     const el=$(id);if(el)el.addEventListener('input',calc);
   });
