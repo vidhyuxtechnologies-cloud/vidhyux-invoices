@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v7-06072026 -->
+<!-- v8-06072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -847,7 +847,13 @@ function renderInvoice(r){
       <div class="role">Authorized Signatory</div>
     </div>
   </div>
-  <div class="inv-decl">We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.${$('method').value!=='custom'?' Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).':''}</div>
+  <div class="inv-decl">We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. ${(()=>{
+    const m=$('method').value;
+    if(m==='m1')return'Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).';
+    if(m==='m2')return'Solar Power Generating System supplied under HSN 854143 taxable @ 5% GST as per Sr. No. 437, Schedule I of Notification No. 9/2025-Central Tax (Rate).';
+    if(m==='m3')return'Installation services in relation to setting up of Solar Power Generating System taxable @ 18% under SAC 995461 as per Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).';
+    return'';
+  })()}</div>
   <div class="inv-gsttag">
     <span>Tax payable on reverse charge: <b>No</b></span>
     <span>Place of Supply: <b>Maharashtra (27)</b></span>
@@ -1438,7 +1444,13 @@ async function saveToGDrive(){
 
   <!-- DECLARATION -->
   <div style="padding:10px 24px;font-size:10.5px;color:#8a94a3;background:#f9fbff;border-top:1px solid #e8edf6;text-align:center">
-    We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.${$('method').value!=='custom'?' Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).':''}
+    We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct. ${(()=>{
+      const m=$('method').value;
+      if(m==='m1')return'Value of goods and services apportioned 70:30 as per Explanation to relevant entry of Notification No. 9/2025-Central Tax (Rate) read with Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).';
+      if(m==='m2')return'Solar Power Generating System supplied under HSN 854143 taxable @ 5% GST as per Sr. No. 437, Schedule I of Notification No. 9/2025-Central Tax (Rate).';
+      if(m==='m3')return'Installation services in relation to setting up of Solar Power Generating System taxable @ 18% under SAC 995461 as per Sr. No. 38 of Notification No. 11/2017-Central Tax (Rate).';
+      return'';
+    })()}
   </div>
   <div style="padding:8px 24px 14px;font-size:11px;color:#5b6b7f;background:#f9fbff">
     &#8226; Tax payable on reverse charge: <b>No</b> &nbsp;&nbsp; &#8226; Place of Supply: <b>Maharashtra (27)</b> &nbsp;&nbsp; &#8226; Subject to Yavatmal Jurisdiction
