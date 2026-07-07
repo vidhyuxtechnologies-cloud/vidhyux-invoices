@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v11-06072026 -->
+<!-- v12-07072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -277,10 +277,6 @@
 <div class="wrap">
   <!-- ============ LEFT: FORM ============ -->
   <div>
-    <div class="notice notice-print-hide">
-      <b>GST note (from 22 Sep 2025):</b> Solar cells &amp; the solar power generating system are now <b>5%</b> (was 12%).
-      Installation-as-service is 18%. Two treatments exist — pick your method below and confirm with your CA which one your PM Surya Ghar contracts use.
-    </div>
 
     <div class="card">
       <h2>Invoice details</h2>
@@ -832,10 +828,7 @@ function extractSeqNum(invno){
 }
 function buildNextInvNo(){
   const last = highestSavedInvNo();
-  if(!last) {
-    const d=new Date();
-    return`${d.getFullYear()}/N/${String(d.getMonth()+1).padStart(2,'0')}/01`;
-  }
+  if(!last) return '2026/N/06/01'; // starting serial per CA records
   const m = last.match(/^(.*?)(\d+)$/);
   if(m){ const w=m[2].length; return m[1]+String(parseInt(m[2],10)+1).padStart(w,'0'); }
   return last;
