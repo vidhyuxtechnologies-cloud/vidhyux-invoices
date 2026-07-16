@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v12-07072026 -->
+<!-- v13-16072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -297,54 +297,6 @@
     </div>
 
     <div class="card">
-      <h2>Customer (Consignee)</h2>
-      <div class="field">
-        <label>Name</label>
-        <input id="cust" placeholder="e.g. RADELAL BHAIYLAL JAYASWAL">
-      </div>
-      <div class="field">
-        <label>Consumer Address</label>
-        <input id="custAddr" placeholder="e.g. Wadgaon Road Yavatmal 445001">
-      </div>
-      <div class="field row">
-        <div>
-          <label>Consumer Number</label>
-          <input id="consumerNo" placeholder="e.g. 378170669901">
-        </div>
-        <div>
-          <label>Mobile No.</label>
-          <input id="custMobile" placeholder="e.g. 9876543210" inputmode="numeric">
-        </div>
-      </div>
-      <div class="field">
-        <label>National Portal Application No.</label>
-        <input id="portalAppNo" placeholder="e.g. NP-MHSED26-13590308">
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Solar system</h2>
-      <div class="field row">
-        <div><label>Panel brand</label><input id="panelBrand" placeholder="Adani"></div>
-        <div><label>Panel qty</label><input id="panelQty" placeholder="8" inputmode="numeric"></div>
-      </div>
-      <div class="field row3">
-        <div><label>Inverter brand</label><input id="invBrand" placeholder="Polycab"></div>
-        <div><label>Inverter kW</label><input id="invKw" placeholder="5" inputmode="decimal"></div>
-        <div><label>Phase</label>
-          <select id="invPhase"><option>1 Ph</option><option>3 Ph</option></select>
-        </div>
-      </div>
-      <div class="field row">
-        <div><label>HSN (goods) — 854143 = solar panels/SPGS</label><input id="hsn" value="854143"></div>
-        <div><label>Panel warranty (yrs, 80% output)</label><input id="wPanel" value="25"></div>
-      </div>
-      <div class="field">
-        <label>Inverter warranty (yrs)</label><input id="wInv" value="07">
-      </div>
-    </div>
-
-    <div class="card">
       <h2>Equipment Serial Numbers</h2>
       <div class="field">
         <label>📋 Paste entire portal page (Ctrl+A → Ctrl+C on application details)</label>
@@ -412,6 +364,55 @@
 
       <div class="breakdown" id="breakdown"></div>
     </div>
+
+    <div class="card">
+      <h2>Customer (Consignee)</h2>
+      <div class="field">
+        <label>Name</label>
+        <input id="cust" placeholder="e.g. RADELAL BHAIYLAL JAYASWAL">
+      </div>
+      <div class="field">
+        <label>Consumer Address</label>
+        <input id="custAddr" placeholder="e.g. Wadgaon Road Yavatmal 445001">
+      </div>
+      <div class="field row">
+        <div>
+          <label>Consumer Number</label>
+          <input id="consumerNo" placeholder="e.g. 378170669901">
+        </div>
+        <div>
+          <label>Mobile No.</label>
+          <input id="custMobile" placeholder="e.g. 9876543210" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field">
+        <label>National Portal Application No.</label>
+        <input id="portalAppNo" placeholder="e.g. NP-MHSED26-13590308">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Solar system</h2>
+      <div class="field row">
+        <div><label>Panel brand</label><input id="panelBrand" placeholder="Adani"></div>
+        <div><label>Panel qty</label><input id="panelQty" placeholder="8" inputmode="numeric"></div>
+      </div>
+      <div class="field row3">
+        <div><label>Inverter brand</label><input id="invBrand" placeholder="Polycab"></div>
+        <div><label>Inverter kW</label><input id="invKw" placeholder="5" inputmode="decimal"></div>
+        <div><label>Phase</label>
+          <select id="invPhase"><option>1 Ph</option><option>3 Ph</option></select>
+        </div>
+      </div>
+      <div class="field row">
+        <div><label>HSN (goods) — 854143 = solar panels/SPGS</label><input id="hsn" value="854143"></div>
+        <div><label>Panel warranty (yrs, 80% output)</label><input id="wPanel" value="25"></div>
+      </div>
+      <div class="field">
+        <label>Inverter warranty (yrs)</label><input id="wInv" value="07">
+      </div>
+    </div>
+
 
     <div class="card">
       <details class="settings">
