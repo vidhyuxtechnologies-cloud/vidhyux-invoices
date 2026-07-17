@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v13-16072026 -->
+<!-- v16-17072026 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -268,9 +268,13 @@
 <body>
 <div class="topbar">
   <div class="logo">☀</div>
-  <div>
+  <div style="flex:1">
     <h1>Solar GST Invoice Generator</h1>
     <div class="sub">On-grid / PM Surya Ghar billing — auto GST, zero manual math</div>
+  </div>
+  <div style="text-align:right;font-size:11px;color:#c6d4e6;line-height:1.5;align-self:center">
+    <div style="font-weight:600;color:#fff">Software by Ambient Technology</div>
+    <div><a href="mailto:ambienttechnology007@gmail.com" style="color:#c6d4e6;text-decoration:none">ambienttechnology007@gmail.com</a></div>
   </div>
 </div>
 
@@ -288,6 +292,7 @@
         <div>
           <label>&nbsp;</label>
           <button id="nextBtn" class="btn-ghost mini" style="width:100%" onclick="nextInvNo()">Next #</button>
+          <button class="btn-ghost mini" style="width:100%;margin-top:5px" onclick="newSeries()" title="Start a new invoice series (e.g. new month)">⚙ New Series</button>
         </div>
       </div>
       <div class="field">
@@ -827,12 +832,56 @@ function extractSeqNum(invno){
   const m = String(invno).match(/(\d+)$/);
   return m ? parseInt(m[1],10) : 0;
 }
+
+/* ---------- invoice series management ---------- */
+function seriesPrefixOf(invno){
+  const m=String(invno).match(/^(.*?)(\d+)$/);
+  return m ? m[1] : String(invno);
+}
+function newSeries(){
+  const cur=$('invno').value||'';
+  const inp=prompt(
+    'Start a NEW invoice series.\n\nEnter the FIRST invoice number of the new series.\nExample: AT/26/7/01  (company/year/month/number)\n\nNumbering will continue automatically within this series.',
+    cur);
+  if(inp===null) return;
+  const v=inp.trim();
+  if(!/\d+$/.test(v)){ flash('Series must end with a number, e.g. AT/26/7/01'); return; }
+  store.set('series_prefix', seriesPrefixOf(v));
+  store.set('series_seed', v);
+  $('invno').value=v;
+  setViewMode(false);
+  calc();
+  flash('✅ New series started: '+v+' — next invoices continue from here.',5000);
+}
+
 function buildNextInvNo(){
-  const last = highestSavedInvNo();
-  if(!last) return '2026/N/06/01'; // starting serial per CA records
-  const m = last.match(/^(.*?)(\d+)$/);
-  if(m){ const w=m[2].length; return m[1]+String(parseInt(m[2],10)+1).padStart(w,'0'); }
-  return last;
+  // series-aware: continue numbering within the current series prefix
+  const reg = store.get('register')||[];
+  let prefix = store.get('series_prefix')||'';
+  if(!prefix){
+    const last = store.get('last_invno')||'';
+    if(last) prefix = seriesPrefixOf(last);
+  }
+  if(!prefix){
+    const seed = store.get('series_seed');
+    return seed || '2026/N/06/01';
+  }
+  // highest number saved within this series
+  let best = 0, width = 2;
+  const consider = reg.map(x=>x.invno||'').concat([store.get('last_invno')||'']);
+  for(const no of consider){
+    if(!no.startsWith(prefix)) continue;
+    const rest = no.slice(prefix.length);
+    if(!/^\d+$/.test(rest)) continue;
+    const n = parseInt(rest,10);
+    if(n>best){ best=n; width=rest.length; }
+  }
+  if(best===0){
+    const seed = store.get('series_seed')||'';
+    if(seed.startsWith(prefix)) return seed;
+    return prefix + '01';
+  }
+  return prefix + String(best+1).padStart(width,'0');
 }
 function nextInvNo(){
   // always jump to next after highest saved — ignores whatever is in the field
@@ -1003,9 +1052,8 @@ async function finalisAndSave(){
   const entry=snapshot();
   reg.unshift(entry);
   store.set('register',reg.slice(0,500));
-  const curHighest = extractSeqNum(highestSavedInvNo());
-  const thisNum = extractSeqNum(entry.invno);
-  if(thisNum >= curHighest) store.set('last_invno', entry.invno);
+  store.set('last_invno', entry.invno);
+  store.set('series_prefix', seriesPrefixOf(entry.invno));
   renderRegister();
   flash(`✔ Saved — ${entry.invno} · ${(entry.cust||'').toUpperCase()} · ₹${entry.total.toLocaleString('en-IN')}`);
   downloadPDF();
@@ -1644,5 +1692,9 @@ function init(){
 }
 init();
 </script>
+<div class="notice-print-hide" style="text-align:center;padding:18px 12px 28px;color:#8a94a3;font-size:12px;line-height:1.7">
+  <div>Software developed by <b style="color:#5b6b7f">Ambient Technology</b></div>
+  <div><a href="mailto:ambienttechnology007@gmail.com" style="color:#8a94a3">ambienttechnology007@gmail.com</a></div>
+</div>
 </body>
 </html>
